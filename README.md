@@ -48,10 +48,10 @@ xcodegen generate
 ```
 
 ```bash
-xcodebuild -project LANNudge.xcodeproj -scheme LANNudge -destination 'platform=macOS' -derivedDataPath build test
+xcodebuild -project LANNudge.xcodeproj -scheme LANNudge -destination 'platform=macOS' -derivedDataPath build/DerivedData.noindex test
 ```
 
-產物：`build/Build/Products/Debug/LANNudge.app`。修改 `project.yml` 或新增檔案後，要重新跑 `xcodegen generate`。
+產物：`build/DerivedData.noindex/Build/Products/Debug/LANNudge.app`。資料夾名稱以 `.noindex` 結尾，Spotlight 就不會把開發版列進搜尋結果，不會跟 `/Applications` 裡安裝的版本重複出現。修改 `project.yml` 或新增檔案後，要重新跑 `xcodegen generate`。
 
 - 跑測試時會啟動一份 App 當作測試宿主，這份 App 不會啟動區網功能，所以不會干擾你正在使用的 LAN Nudge。
 - `MutualTLSTests` 會在登入鑰匙圈建立兩組暫時身分（`LAN Nudge Test A/B`），測完就刪除。
@@ -68,9 +68,16 @@ zsh scripts/package.sh
 3. 用 `create-dmg` 做成拖曳安裝的 DMG：背景有箭頭，右邊放「Applications」捷徑。
 4. 輸出到 `release/LANNudge-<版本>-<build>.dmg`，並刪掉 `release/` 裡較舊的 DMG。
 
+為了避免公開的 DMG 透露打包者的家目錄路徑（例如 `/Users/<帳號>/...`），腳本會：
+- 編譯時用 `-ffile-prefix-map` 把專案路徑改寫成 `.`。swift-crypto 的 C 程式碼會把原始檔路徑寫進執行檔。
+- Release 建置時去掉除錯符號（`STRIP_STYLE=debugging`）。符號表裡記錄了物件檔和模組的絕對路徑；.dSYM 仍保留完整資訊，可以用來解讀當機紀錄。
+- 在 `mktemp` 建立的隨機暫存資料夾裡製作 DMG，再搬到 `release/`。create-dmg 會把暫存映像檔的路徑寫進 DMG 的 `.DS_Store`。
+
+發佈前可以這樣檢查：掛載 DMG 後，在磁碟區內用 `grep -rlaE "/Users/"` 搜尋，應該找不到任何結果。
+
 版本號在 `project.yml` 的 `MARKETING_VERSION`（例如 0.2.0）和 `CURRENT_PROJECT_VERSION`（建置號），每次發佈前都要遞增。第一次執行時，`create-dmg` 會用 AppleScript 排列 Finder 視窗，系統可能會詢問是否允許 Finder 自動化。
 
-DMG 裡的 App 叫「LAN Nudge.app」，跟開發用的 `build/.../LANNudge.app` 共用同一組鑰匙圈身分。**不要同時執行這兩份**，否則兩份會用同一個名稱在 Bonjour 上公告，互相衝突。
+DMG 裡的 App 叫「LAN Nudge.app」，跟開發用的 `build/DerivedData.noindex/.../LANNudge.app` 共用同一組鑰匙圈身分。**不要同時執行這兩份**，否則兩份會用同一個名稱在 Bonjour 上公告，互相衝突。
 
 ## App 圖示
 
@@ -120,11 +127,11 @@ macOS 只允許 App 透過輔助使用（Accessibility）API 移動其他 App �
 ### 單台 Mac 測試（兩個實例）
 
 ```bash
-open -n build/Build/Products/Debug/LANNudge.app
+open -n build/DerivedData.noindex/Build/Products/Debug/LANNudge.app
 ```
 
 ```bash
-open -n build/Build/Products/Debug/LANNudge.app --args -instance B
+open -n build/DerivedData.noindex/Build/Products/Debug/LANNudge.app --args -instance B
 ```
 
 第二個實例會使用獨立的鑰匙圈身分（`LAN Nudge Identity B`）和設定，選單第一行會顯示「（實例 B）」。兩個實例在同一台 Mac 上，提醒會出現在同一個螢幕；看提醒上的名稱，就知道是誰戳誰。
@@ -152,6 +159,7 @@ open -n build/Build/Products/Debug/LANNudge.app --args -instance B
 | 2026-11-23 | ├ 真實視窗震動 | 沒有自動測試（需要輔助使用權限和實際視窗） |
 | 2026-11-23 | 真實視窗震動，人工操作（單台 Mac，已開輔助使用權限） | 視窗震動成功（使用者回報） |
 | 2026-11-23 | `zsh scripts/package.sh` | 26 個測試通過 → Release 建置 → `release/LANNudge-0.2.0-2.dmg`（6.3 MB） |
+| 2026-11-23 | 隱私檢查（修正後重新打包） | 整個 DMG 磁碟區（App、`.DS_Store`、背景圖）都找不到 `/Users/` 或帳號名稱；DMG 5.3 MB，SHA-256 `fc6943c6e09d32841a1d790e68022161b9f65f6dd2ac7ec17f2b424ab03dcaed`；已發佈為 GitHub Release v0.2.0，下載後比對 SHA-256 一致 |
 | 2026-11-23 | 唯讀掛載 DMG 檢查 | 內含「LAN Nudge.app」與 Applications 捷徑；版本 0.2.0 (2)；含 `AppIcon.icns`；`Signature=adhoc`，`codesign --verify --deep --strict` 通過；entitlements 只有 `app-sandbox = false`，沒有 `get-task-allow` |
 | 2026-11-23 | ├ 身分 | 用同一個標籤重新載入，得到同一個指紋 |
 | 2026-11-23 | `dns-sd -Z _lannudge._tcp` | 兩個實例都有公告，TXT 內有 `fp`、`name`、`port`、`addrs` |
