@@ -11,7 +11,11 @@ struct NudgeView: View {
             // t == 0 renders the static frame used for Reduce Motion.
             let t = reduceMotion ? 0 : context.date.timeIntervalSince(start)
             VStack(spacing: 8) {
-                if effect == .cartoonShock { ShockGuy(t: t) }
+                switch effect {
+                case .cartoonShock: ShockGuy(t: t)
+                case .knock: KnockDoor(t: t)
+                case .shake: EmptyView()
+                }
                 label.offset(x: effect == .shake ? Self.shakeOffset(t) : 0)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -21,9 +25,12 @@ struct NudgeView: View {
 
     private var label: some View {
         HStack(spacing: 8) {
-            Image(systemName: effect == .shake ? "hand.point.right.fill" : "bolt.fill")
-                .foregroundStyle(.yellow)
-            Text("\(sender) 戳了你一下")
+            switch effect {
+            case .cartoonShock: Image(systemName: "bolt.fill").foregroundStyle(.yellow)
+            case .shake: Image(systemName: "hand.point.right.fill").foregroundStyle(.yellow)
+            case .knock: Image(systemName: "hand.raised.fill").foregroundStyle(.brown)
+            }
+            Text(effect == .knock ? "\(sender) 在敲你的門" : "\(sender) 戳了你一下")
                 .font(.headline)
                 .lineLimit(1)
         }
@@ -33,7 +40,10 @@ struct NudgeView: View {
         .shadow(radius: 4)
     }
 
-    /// ~9 Hz side-to-side, decaying to rest over the overlay's lifetime.
+    /// Seconds from the start; shared with the knock sound so picture and sound line up.
+    nonisolated static let knockTimes: [Double] = [0, 0.22, 0.44]
+
+    /// ~9 Hz side-to-side, decaying to rest after ~1.1 s.
     nonisolated static func shakeOffset(_ t: Double) -> CGFloat {
         let decay = max(0, 1 - t / 1.1)
         return CGFloat(sin(t * 2 * .pi * 9) * 16 * decay)
@@ -92,5 +102,38 @@ private struct ShockGuy: View {
         }
         .frame(width: 130, height: 120)
         .offset(x: jitter)
+    }
+}
+
+/// Door that jolts on each knock while "叩" marks pop in beside it.
+private struct KnockDoor: View {
+    let t: Double
+
+    var body: some View {
+        let times = NudgeView.knockTimes
+        let sinceLast = times.map { t - $0 }.filter { $0 >= 0 }.min() ?? 1
+        let jolt = t == 0 ? 0 : max(0, 1 - sinceLast / 0.15)
+
+        HStack(alignment: .center, spacing: 6) {
+            Image(systemName: "door.left.hand.closed")
+                .font(.system(size: 70))
+                .foregroundStyle(Color(red: 0.55, green: 0.35, blue: 0.2))
+                .rotationEffect(.degrees(jolt * 3), anchor: .bottomLeading)
+                .offset(x: jolt * 2)
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(times.indices, id: \.self) { i in
+                    let since = t - times[i]
+                    // Reduce Motion (t == 0) shows all three at rest.
+                    let shown = t == 0 || since >= 0
+                    let pop = t == 0 ? 1 : 1 + max(0, 0.4 - since * 3)
+                    Text("叩")
+                        .font(.system(size: 20, weight: .heavy))
+                        .opacity(shown ? 1 : 0)
+                        .scaleEffect(shown ? pop : 0.5)
+                        .offset(x: CGFloat(i) * 8)
+                }
+            }
+        }
+        .frame(width: 150, height: 110)
     }
 }

@@ -11,12 +11,15 @@
 		110D08E4F7606E04EEE57E91 /* OverlayPlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29A5F3091C7A3354B395B7B8 /* OverlayPlacementTests.swift */; };
 		1297DE5E1E8B89D6DA1FD0DE /* MutualTLSTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C6995B00213FEF3626DD244 /* MutualTLSTests.swift */; };
 		2FD8DF29DBA3877B28A1276E /* LANNudgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4820B770254988E114E609C /* LANNudgeApp.swift */; };
+		34120478526571EB49DF6E82 /* WindowShaker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16A6B6CE832952D5F566B23B /* WindowShaker.swift */; };
+		3D4B8BB9CBC6CC4CA76AAC84 /* Sounds.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAF2B87770AB2956207FCDC8 /* Sounds.swift */; };
 		42475273DFB063973B9F3D54 /* OverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5622ADB04909C1B953FF113 /* OverlayController.swift */; };
 		4514118EF9DDF1ECFDBF7CE0 /* ReceiveGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB9C7AD79105949F9879ED1 /* ReceiveGateTests.swift */; };
 		4D0D5BDE8105D12181FC3666 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAD012FA7C27799249D50E5F /* AppModel.swift */; };
 		62DE1F7A7B176A5A788278C1 /* NudgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5686A9AFA0A1A9619FAE8494 /* NudgeView.swift */; };
 		67A91A31D404FD7D92177F86 /* ProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01082B9C1E1B9B17961BCAAD /* ProtocolTests.swift */; };
 		930B277BAD478F69595F51F1 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9317213E6A7439E68FEAC001 /* SettingsView.swift */; };
+		B0F9011D7272E53A464CDB42 /* SoundsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0CC5AD076D922D096EE1921 /* SoundsTests.swift */; };
 		B86D86D4B2B4329A4FBFEE93 /* Identity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47562DB5D519568C5D6E8868 /* Identity.swift */; };
 		C4E9B4B3ED7BB5FAFCA6176B /* X509 in Frameworks */ = {isa = PBXBuildFile; productRef = F680C3A5964E97EAC88AF865 /* X509 */; };
 		C554E15257A556D0549AEB73 /* ReceiveGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D092F7D48001727B7B90AC0 /* ReceiveGate.swift */; };
@@ -35,6 +38,7 @@
 
 /* Begin PBXFileReference section */
 		01082B9C1E1B9B17961BCAAD /* ProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolTests.swift; sourceTree = "<group>"; };
+		16A6B6CE832952D5F566B23B /* WindowShaker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowShaker.swift; sourceTree = "<group>"; };
 		1C6995B00213FEF3626DD244 /* MutualTLSTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MutualTLSTests.swift; sourceTree = "<group>"; };
 		1EC478D778C8D1C74AC14CE1 /* LANNudge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LANNudge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		21123F621134C12F5722BEFC /* LANNudge.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LANNudge.entitlements; sourceTree = "<group>"; };
@@ -48,9 +52,11 @@
 		B4610106FE0403654B0C7D0F /* LANNudgeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LANNudgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BAB9C7AD79105949F9879ED1 /* ReceiveGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiveGateTests.swift; sourceTree = "<group>"; };
 		CAD012FA7C27799249D50E5F /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		D0CC5AD076D922D096EE1921 /* SoundsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundsTests.swift; sourceTree = "<group>"; };
 		E4820B770254988E114E609C /* LANNudgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LANNudgeApp.swift; sourceTree = "<group>"; };
 		F5622ADB04909C1B953FF113 /* OverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayController.swift; sourceTree = "<group>"; };
 		F9373CB88DB3512E217EA518 /* Protocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Protocol.swift; sourceTree = "<group>"; };
+		FAF2B87770AB2956207FCDC8 /* Sounds.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sounds.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -90,6 +96,7 @@
 				29A5F3091C7A3354B395B7B8 /* OverlayPlacementTests.swift */,
 				01082B9C1E1B9B17961BCAAD /* ProtocolTests.swift */,
 				BAB9C7AD79105949F9879ED1 /* ReceiveGateTests.swift */,
+				D0CC5AD076D922D096EE1921 /* SoundsTests.swift */,
 			);
 			path = LANNudgeTests;
 			sourceTree = "<group>";
@@ -108,6 +115,8 @@
 				F9373CB88DB3512E217EA518 /* Protocol.swift */,
 				2D092F7D48001727B7B90AC0 /* ReceiveGate.swift */,
 				9317213E6A7439E68FEAC001 /* SettingsView.swift */,
+				FAF2B87770AB2956207FCDC8 /* Sounds.swift */,
+				16A6B6CE832952D5F566B23B /* WindowShaker.swift */,
 			);
 			path = LANNudge;
 			sourceTree = "<group>";
@@ -208,6 +217,8 @@
 				10031672E368F904C25AF5D3 /* Protocol.swift in Sources */,
 				C554E15257A556D0549AEB73 /* ReceiveGate.swift in Sources */,
 				930B277BAD478F69595F51F1 /* SettingsView.swift in Sources */,
+				3D4B8BB9CBC6CC4CA76AAC84 /* Sounds.swift in Sources */,
+				34120478526571EB49DF6E82 /* WindowShaker.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -219,6 +230,7 @@
 				110D08E4F7606E04EEE57E91 /* OverlayPlacementTests.swift in Sources */,
 				67A91A31D404FD7D92177F86 /* ProtocolTests.swift in Sources */,
 				4514118EF9DDF1ECFDBF7CE0 /* ReceiveGateTests.swift in Sources */,
+				B0F9011D7272E53A464CDB42 /* SoundsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

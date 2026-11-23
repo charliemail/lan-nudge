@@ -34,9 +34,9 @@ targets:
     entitlements:
       path: LANNudge/LANNudge.entitlements
       properties:
-        com.apple.security.app-sandbox: true
-        com.apple.security.network.client: true
-        com.apple.security.network.server: true
+        # Off by decision: shaking another app's window needs the Accessibility API,
+        # which sandboxed apps can't use.
+        com.apple.security.app-sandbox: false
     dependencies:
       - package: X509
     settings:

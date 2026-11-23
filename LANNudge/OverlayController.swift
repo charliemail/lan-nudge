@@ -5,7 +5,8 @@ import SwiftUI
 final class OverlayController {
     static let shared = OverlayController()
     static let panelSize = CGSize(width: 280, height: 210)
-    static let duration: Duration = .milliseconds(1200)
+    /// Longer than the spec's ~1 s: at 1.2 s the shock was gone before people noticed it.
+    static let duration: Duration = .seconds(2)
 
     private var panel: NSPanel?
     var isShowing: Bool { panel != nil }
@@ -17,13 +18,13 @@ final class OverlayController {
         let screens = NSScreen.screens.map { (frame: $0.frame, visible: $0.visibleFrame) }
         guard let visible = Self.visibleFrame(for: NSEvent.mouseLocation, screens: screens) else { return false }
 
+        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         let panel = OverlayPanel(contentRect: Self.frame(size: Self.panelSize, in: visible))
-        panel.contentView = NSHostingView(rootView: NudgeView(
-            effect: effect,
-            sender: sender,
-            reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        ))
+        panel.contentView = NSHostingView(rootView: NudgeView(effect: effect, sender: sender, reduceMotion: reduceMotion))
         panel.orderFrontRegardless()
+        Sounds.play(effect)
+        // The overlay label still names the sender; the real window shake is best-effort on top.
+        if effect == .shake, !reduceMotion { _ = WindowShaker.shakeFrontWindow() }
         self.panel = panel
 
         Task {

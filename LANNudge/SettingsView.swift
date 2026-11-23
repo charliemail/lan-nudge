@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     let model: AppModel
     @State private var name = ""
+    @State private var axTrusted = WindowShaker.isTrusted
 
     var body: some View {
         Form {
@@ -15,6 +16,18 @@ struct SettingsView: View {
                 }
                 if let error = model.identityError {
                     Text(error).foregroundStyle(.red)
+                }
+                LabeledContent("震動真實視窗") {
+                    if axTrusted {
+                        Text("已允許").foregroundStyle(.secondary)
+                    } else {
+                        Button("開啟輔助使用權限…") { WindowShaker.requestPermission() }
+                    }
+                }
+                if !axTrusted {
+                    Text("未允許時，「視窗震動」只會晃動提醒小窗。重新建置或更新 App 後，請在「系統設定 → 隱私權與安全性 → 輔助使用」移除 LAN Nudge 再重新加入。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -37,6 +50,13 @@ struct SettingsView: View {
         .onAppear {
             name = model.displayName
             NSApp.activate()
+        }
+        .task {
+            // The system sends no notification when the permission changes; poll while open.
+            while !Task.isCancelled {
+                axTrusted = WindowShaker.isTrusted
+                try? await Task.sleep(for: .seconds(1))
+            }
         }
     }
 
