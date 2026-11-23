@@ -1,0 +1,63 @@
+name: LANNudge
+options:
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+packages:
+  X509:
+    url: https://github.com/apple/swift-certificates
+    from: "1.21.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # Ad-hoc signing by decision: no Apple Development identity; users approve via "Open Anyway".
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+    ENABLE_HARDENED_RUNTIME: NO
+targets:
+  LANNudge:
+    type: application
+    platform: macOS
+    sources: [LANNudge]
+    info:
+      path: LANNudge/Info.plist
+      properties:
+        CFBundleDisplayName: LAN Nudge
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSUIElement: true
+        NSLocalNetworkUsageDescription: LAN Nudge 需要存取區域網路，才能找到同一網路上的 Mac 並互相傳送提醒。
+        NSBonjourServices: [_lannudge._tcp]
+    entitlements:
+      path: LANNudge/LANNudge.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.security.network.server: true
+    dependencies:
+      - package: X509
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.lannudge.LANNudge
+        PRODUCT_NAME: LANNudge
+  LANNudgeTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [LANNudgeTests]
+    dependencies:
+      - target: LANNudge
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.lannudge.LANNudgeTests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  LANNudge:
+    build:
+      targets:
+        LANNudge: all
+        LANNudgeTests: [test]
+    test:
+      targets: [LANNudgeTests]

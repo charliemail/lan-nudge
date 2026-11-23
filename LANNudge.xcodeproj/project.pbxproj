@@ -1,0 +1,487 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		10031672E368F904C25AF5D3 /* Protocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9373CB88DB3512E217EA518 /* Protocol.swift */; };
+		110D08E4F7606E04EEE57E91 /* OverlayPlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29A5F3091C7A3354B395B7B8 /* OverlayPlacementTests.swift */; };
+		1297DE5E1E8B89D6DA1FD0DE /* MutualTLSTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C6995B00213FEF3626DD244 /* MutualTLSTests.swift */; };
+		2FD8DF29DBA3877B28A1276E /* LANNudgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4820B770254988E114E609C /* LANNudgeApp.swift */; };
+		42475273DFB063973B9F3D54 /* OverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5622ADB04909C1B953FF113 /* OverlayController.swift */; };
+		4514118EF9DDF1ECFDBF7CE0 /* ReceiveGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB9C7AD79105949F9879ED1 /* ReceiveGateTests.swift */; };
+		4D0D5BDE8105D12181FC3666 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAD012FA7C27799249D50E5F /* AppModel.swift */; };
+		62DE1F7A7B176A5A788278C1 /* NudgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5686A9AFA0A1A9619FAE8494 /* NudgeView.swift */; };
+		67A91A31D404FD7D92177F86 /* ProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01082B9C1E1B9B17961BCAAD /* ProtocolTests.swift */; };
+		930B277BAD478F69595F51F1 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9317213E6A7439E68FEAC001 /* SettingsView.swift */; };
+		B86D86D4B2B4329A4FBFEE93 /* Identity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47562DB5D519568C5D6E8868 /* Identity.swift */; };
+		C4E9B4B3ED7BB5FAFCA6176B /* X509 in Frameworks */ = {isa = PBXBuildFile; productRef = F680C3A5964E97EAC88AF865 /* X509 */; };
+		C554E15257A556D0549AEB73 /* ReceiveGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D092F7D48001727B7B90AC0 /* ReceiveGate.swift */; };
+		FF4BC9235246C3F7B794CE90 /* PeerNetwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A36599CA4BF33858469B2D6 /* PeerNetwork.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		6567594513F1F68C351FFFC0 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E912AF15B0A69E7AECC21FBF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8585737E55577B5C50AE40C4;
+			remoteInfo = LANNudge;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		01082B9C1E1B9B17961BCAAD /* ProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolTests.swift; sourceTree = "<group>"; };
+		1C6995B00213FEF3626DD244 /* MutualTLSTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MutualTLSTests.swift; sourceTree = "<group>"; };
+		1EC478D778C8D1C74AC14CE1 /* LANNudge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LANNudge.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		21123F621134C12F5722BEFC /* LANNudge.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LANNudge.entitlements; sourceTree = "<group>"; };
+		29A5F3091C7A3354B395B7B8 /* OverlayPlacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayPlacementTests.swift; sourceTree = "<group>"; };
+		2D092F7D48001727B7B90AC0 /* ReceiveGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiveGate.swift; sourceTree = "<group>"; };
+		47562DB5D519568C5D6E8868 /* Identity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Identity.swift; sourceTree = "<group>"; };
+		5686A9AFA0A1A9619FAE8494 /* NudgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NudgeView.swift; sourceTree = "<group>"; };
+		7A36599CA4BF33858469B2D6 /* PeerNetwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeerNetwork.swift; sourceTree = "<group>"; };
+		9317213E6A7439E68FEAC001 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		94D028BA01224165E4BA7515 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		B4610106FE0403654B0C7D0F /* LANNudgeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LANNudgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		BAB9C7AD79105949F9879ED1 /* ReceiveGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiveGateTests.swift; sourceTree = "<group>"; };
+		CAD012FA7C27799249D50E5F /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		E4820B770254988E114E609C /* LANNudgeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LANNudgeApp.swift; sourceTree = "<group>"; };
+		F5622ADB04909C1B953FF113 /* OverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayController.swift; sourceTree = "<group>"; };
+		F9373CB88DB3512E217EA518 /* Protocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Protocol.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		FD926B9FBE9E0591D2467CBA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C4E9B4B3ED7BB5FAFCA6176B /* X509 in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		2AF79A7EDBFAB1E75011010E = {
+			isa = PBXGroup;
+			children = (
+				E313BB0B1C5B0469BE7E7F28 /* LANNudge */,
+				805D5DF348E55707D78FE28B /* LANNudgeTests */,
+				4ABF49C30544C298236272B9 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		4ABF49C30544C298236272B9 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				1EC478D778C8D1C74AC14CE1 /* LANNudge.app */,
+				B4610106FE0403654B0C7D0F /* LANNudgeTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		805D5DF348E55707D78FE28B /* LANNudgeTests */ = {
+			isa = PBXGroup;
+			children = (
+				1C6995B00213FEF3626DD244 /* MutualTLSTests.swift */,
+				29A5F3091C7A3354B395B7B8 /* OverlayPlacementTests.swift */,
+				01082B9C1E1B9B17961BCAAD /* ProtocolTests.swift */,
+				BAB9C7AD79105949F9879ED1 /* ReceiveGateTests.swift */,
+			);
+			path = LANNudgeTests;
+			sourceTree = "<group>";
+		};
+		E313BB0B1C5B0469BE7E7F28 /* LANNudge */ = {
+			isa = PBXGroup;
+			children = (
+				CAD012FA7C27799249D50E5F /* AppModel.swift */,
+				47562DB5D519568C5D6E8868 /* Identity.swift */,
+				94D028BA01224165E4BA7515 /* Info.plist */,
+				21123F621134C12F5722BEFC /* LANNudge.entitlements */,
+				E4820B770254988E114E609C /* LANNudgeApp.swift */,
+				5686A9AFA0A1A9619FAE8494 /* NudgeView.swift */,
+				F5622ADB04909C1B953FF113 /* OverlayController.swift */,
+				7A36599CA4BF33858469B2D6 /* PeerNetwork.swift */,
+				F9373CB88DB3512E217EA518 /* Protocol.swift */,
+				2D092F7D48001727B7B90AC0 /* ReceiveGate.swift */,
+				9317213E6A7439E68FEAC001 /* SettingsView.swift */,
+			);
+			path = LANNudge;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		617C815ABB25620B22C21AE5 /* LANNudgeTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8BF426043B05EA562783BDA5 /* Build configuration list for PBXNativeTarget "LANNudgeTests" */;
+			buildPhases = (
+				DB1749B8D5436E72E01FE32D /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CFDE9AD66440E65E2A6FFCF9 /* PBXTargetDependency */,
+			);
+			name = LANNudgeTests;
+			packageProductDependencies = (
+			);
+			productName = LANNudgeTests;
+			productReference = B4610106FE0403654B0C7D0F /* LANNudgeTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		8585737E55577B5C50AE40C4 /* LANNudge */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9DC977C93BF1F00E86257AA2 /* Build configuration list for PBXNativeTarget "LANNudge" */;
+			buildPhases = (
+				AAF7B315154BA181072404CB /* Sources */,
+				FD926B9FBE9E0591D2467CBA /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LANNudge;
+			packageProductDependencies = (
+				F680C3A5964E97EAC88AF865 /* X509 */,
+			);
+			productName = LANNudge;
+			productReference = 1EC478D778C8D1C74AC14CE1 /* LANNudge.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E912AF15B0A69E7AECC21FBF /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					617C815ABB25620B22C21AE5 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Manual;
+					};
+					8585737E55577B5C50AE40C4 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Manual;
+					};
+				};
+			};
+			buildConfigurationList = 109B54CC721123785A8BAB8A /* Build configuration list for PBXProject "LANNudge" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 2AF79A7EDBFAB1E75011010E;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				C71C09BE5042469AFF7E0B43 /* XCRemoteSwiftPackageReference "swift-certificates" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 4ABF49C30544C298236272B9 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8585737E55577B5C50AE40C4 /* LANNudge */,
+				617C815ABB25620B22C21AE5 /* LANNudgeTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AAF7B315154BA181072404CB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4D0D5BDE8105D12181FC3666 /* AppModel.swift in Sources */,
+				B86D86D4B2B4329A4FBFEE93 /* Identity.swift in Sources */,
+				2FD8DF29DBA3877B28A1276E /* LANNudgeApp.swift in Sources */,
+				62DE1F7A7B176A5A788278C1 /* NudgeView.swift in Sources */,
+				42475273DFB063973B9F3D54 /* OverlayController.swift in Sources */,
+				FF4BC9235246C3F7B794CE90 /* PeerNetwork.swift in Sources */,
+				10031672E368F904C25AF5D3 /* Protocol.swift in Sources */,
+				C554E15257A556D0549AEB73 /* ReceiveGate.swift in Sources */,
+				930B277BAD478F69595F51F1 /* SettingsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DB1749B8D5436E72E01FE32D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1297DE5E1E8B89D6DA1FD0DE /* MutualTLSTests.swift in Sources */,
+				110D08E4F7606E04EEE57E91 /* OverlayPlacementTests.swift in Sources */,
+				67A91A31D404FD7D92177F86 /* ProtocolTests.swift in Sources */,
+				4514118EF9DDF1ECFDBF7CE0 /* ReceiveGateTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		CFDE9AD66440E65E2A6FFCF9 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8585737E55577B5C50AE40C4 /* LANNudge */;
+			targetProxy = 6567594513F1F68C351FFFC0 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		2E5C32010509C38BDAF61D23 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = LANNudge/LANNudge.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = LANNudge/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.lannudge.LANNudge;
+				PRODUCT_NAME = LANNudge;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		3D5AE96D03572BC9B2F34E6E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = LANNudge/LANNudge.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				INFOPLIST_FILE = LANNudge/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.lannudge.LANNudge;
+				PRODUCT_NAME = LANNudge;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		4CBC4C18EB8F280D5AB94E8B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		5C2B63365DF8F311B5297A00 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.lannudge.LANNudgeTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LANNudge.app/Contents/MacOS/LANNudge";
+			};
+			name = Release;
+		};
+		93AFD189B0DB63FBF4970C89 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.lannudge.LANNudgeTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/LANNudge.app/Contents/MacOS/LANNudge";
+			};
+			name = Debug;
+		};
+		A7D77225CADBD09B567B3740 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		109B54CC721123785A8BAB8A /* Build configuration list for PBXProject "LANNudge" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A7D77225CADBD09B567B3740 /* Debug */,
+				4CBC4C18EB8F280D5AB94E8B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8BF426043B05EA562783BDA5 /* Build configuration list for PBXNativeTarget "LANNudgeTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				93AFD189B0DB63FBF4970C89 /* Debug */,
+				5C2B63365DF8F311B5297A00 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		9DC977C93BF1F00E86257AA2 /* Build configuration list for PBXNativeTarget "LANNudge" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2E5C32010509C38BDAF61D23 /* Debug */,
+				3D5AE96D03572BC9B2F34E6E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C71C09BE5042469AFF7E0B43 /* XCRemoteSwiftPackageReference "swift-certificates" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-certificates";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.21.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F680C3A5964E97EAC88AF865 /* X509 */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C71C09BE5042469AFF7E0B43 /* XCRemoteSwiftPackageReference "swift-certificates" */;
+			productName = X509;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = E912AF15B0A69E7AECC21FBF /* Project object */;
+}
