@@ -1,3 +1,5 @@
 build/
 .DS_Store
 xcuserdata/
+# DMGs from scripts/package.sh; publish them as GitHub Release assets, not in git
+release/

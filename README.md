@@ -2,7 +2,16 @@
 
 macOS 選單列 App：同一區網內開著 LAN Nudge 的 Mac，可以互相送出「小人觸電」、「視窗震動」或「敲門」提醒，並附帶音效。規格見 `LAN-Nudge-Mac-MVP.md`（原始文件）。
 
-目前進度：第一階段（本機動畫）、第二階段（區網）程式完成，自動測試通過；**兩台實體 Mac 的人工驗收尚未執行**。
+目前版本：**0.2.0 (2)**。第一階段（本機動畫）與第二階段（區網）的程式都已完成，自動測試全部通過；**兩台實體 Mac 的人工驗收尚未執行**。
+
+## 安裝（DMG）
+
+1. 打開 `LANNudge-<版本>-<build>.dmg`，把「LAN Nudge」拖到右邊的「Applications」資料夾。
+2. 第一次開啟會被 Gatekeeper 擋下：到「系統設定 → 隱私權與安全性」按「強制打開」。原因是 App 採 ad-hoc 簽章，沒有經過 Apple 公證，詳見「簽章與安裝」。
+3. 輸入顯示名稱，接著依提示允許「區域網路」；系統詢問鑰匙圈時，選「永遠允許」。
+4. 想要「視窗震動」能晃動你正在用的視窗，請在設定視窗開啟「輔助使用」權限。
+
+DMG 由 `scripts/package.sh` 產生，放在 `release/`。這個資料夾不進 git，要公開發佈請上傳到 GitHub Releases。
 
 ## 與原始規格的差異
 
@@ -30,6 +39,7 @@ macOS 選單列 App：同一區網內開著 LAN Nudge 的 Mac，可以互相送�
 - Xcode 26 以上（開發時使用 Xcode 26.6 / Swift 6.3）
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen)：專案檔由 `project.yml` 產生（`brew install xcodegen`）
 - 依賴（SPM 自動下載）：[apple/swift-certificates](https://github.com/apple/swift-certificates) 1.21.x，用來產生自簽憑證
+- 打包用：[create-dmg](https://github.com/create-dmg/create-dmg)（`brew install create-dmg`）
 
 ## 建置與測試
 
@@ -46,6 +56,31 @@ xcodebuild -project LANNudge.xcodeproj -scheme LANNudge -destination 'platform=m
 - 跑測試時會啟動一份 App 當作測試宿主，這份 App 不會啟動區網功能，所以不會干擾你正在使用的 LAN Nudge。
 - `MutualTLSTests` 會在登入鑰匙圈建立兩組暫時身分（`LAN Nudge Test A/B`），測完就刪除。
 - 重新建置後，正在執行的 LAN Nudge 仍是舊版；要結束後重新開啟才會用到新版。
+
+## 打包 DMG
+
+```bash
+zsh scripts/package.sh
+```
+
+1. 重新產生專案檔並跑單元測試。測試沒過就停止，不會打包。
+2. 用 Release 設定建置。Release 版不帶 `get-task-allow`，也就是不允許除錯器附加。
+3. 用 `create-dmg` 做成拖曳安裝的 DMG：背景有箭頭，右邊放「Applications」捷徑。
+4. 輸出到 `release/LANNudge-<版本>-<build>.dmg`，並刪掉 `release/` 裡較舊的 DMG。
+
+版本號在 `project.yml` 的 `MARKETING_VERSION`（例如 0.2.0）和 `CURRENT_PROJECT_VERSION`（建置號），每次發佈前都要遞增。第一次執行時，`create-dmg` 會用 AppleScript 排列 Finder 視窗，系統可能會詢問是否允許 Finder 自動化。
+
+DMG 裡的 App 叫「LAN Nudge.app」，跟開發用的 `build/.../LANNudge.app` 共用同一組鑰匙圈身分。**不要同時執行這兩份**，否則兩份會用同一個名稱在 Bonjour 上公告，互相衝突。
+
+## App 圖示
+
+原圖放在 `design/app-icon-source.webp`。換圖後執行：
+
+```bash
+zsh scripts/app-icon.sh
+```
+
+腳本會把原圖外圍的白色或透明背景去掉，依 macOS 圖示規格把主體縮放到 1024 畫布中的 824 × 824 範圍，再輸出 16～1024 各種尺寸到 `LANNudge/Assets.xcassets/AppIcon.appiconset`。
 
 ## 簽章與安裝
 
@@ -116,6 +151,8 @@ open -n build/Build/Products/Debug/LANNudge.app --args -instance B
 | 2026-11-23 | ├ 音效 | 三種效果都有聲音（峰值 > 0.1）、沒有爆音（≤ 1），產生的 WAV 可以被 `AVAudioPlayer` 播放，長度正確且小於 2 秒 |
 | 2026-11-23 | ├ 真實視窗震動 | 沒有自動測試（需要輔助使用權限和實際視窗） |
 | 2026-11-23 | 真實視窗震動，人工操作（單台 Mac，已開輔助使用權限） | 視窗震動成功（使用者回報） |
+| 2026-11-23 | `zsh scripts/package.sh` | 26 個測試通過 → Release 建置 → `release/LANNudge-0.2.0-2.dmg`（6.3 MB） |
+| 2026-11-23 | 唯讀掛載 DMG 檢查 | 內含「LAN Nudge.app」與 Applications 捷徑；版本 0.2.0 (2)；含 `AppIcon.icns`；`Signature=adhoc`，`codesign --verify --deep --strict` 通過；entitlements 只有 `app-sandbox = false`，沒有 `get-task-allow` |
 | 2026-11-23 | ├ 身分 | 用同一個標籤重新載入，得到同一個指紋 |
 | 2026-11-23 | `dns-sd -Z _lannudge._tcp` | 兩個實例都有公告，TXT 內有 `fp`、`name`、`port`、`addrs` |
 | 2026-11-23 | `codesign -d --entitlements` | `Signature=adhoc`，`com.apple.security.app-sandbox = false` |
@@ -134,6 +171,7 @@ open -n build/Build/Products/Debug/LANNudge.app --args -instance B
 | 震動真實視窗 | 開啟輔助使用權限後，B 打開文字編輯器並在裡面打字，A 送「視窗震動」 | 文字編輯器視窗左右震動約 1 秒後回到原位，游標和輸入不受影響 |
 | 震動退回小窗 | 沒有權限、全螢幕 App、開啟減少動態效果三種情況分別送「視窗震動」 | 只晃動提醒小窗，不會移動任何視窗 |
 | 重建後的權限 | 重新建置 App 後再送「視窗震動」 | 記錄權限是否失效，以及移除再加入後是否恢復 |
+| DMG 安裝 | 在另一台 Mac 打開 DMG，拖到 Applications 後開啟 | 視窗有背景箭頭；Gatekeeper 擋下後按「強制打開」可以執行；Dock 與 Finder 顯示新圖示 |
 | 首次啟動 | 新使用者第一次開啟 | 設定視窗出現；儲存名稱後跳出區域網路權限詢問 |
 | 區網權限被拒 | 權限詢問時按「不允許」 | 顯示前往系統設定的指引（macOS 27.2 之前無法重置權限，請用新的使用者帳號測） |
 | 探索 | 兩台 Mac 都開啟 | 互相出現在「附近裝置」；關閉其中一台後，從列表消失 |

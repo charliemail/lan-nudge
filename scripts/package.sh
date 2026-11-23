@@ -1,0 +1,50 @@
+#!/bin/zsh
+# Runs the unit tests, Release-builds LANNudge and packages it into release/ as a drag-to-install
+# DMG (create-dmg: arrow background, app + Applications shortcut). Refuses to package if tests fail.
+# Build folders end in .noindex so Spotlight doesn't list build products next to the installed app.
+# Needs: brew install xcodegen create-dmg; Finder automation permission (create-dmg lays out the
+# window via AppleScript). Adapted from lan-listening-room/scripts/package.sh.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+xcodegen generate >/dev/null
+mkdir -p release build
+
+echo "▶ Unit tests"
+xcodebuild -project LANNudge.xcodeproj -scheme LANNudge -destination 'platform=macOS' \
+  -derivedDataPath build test > build/test.log 2>&1 \
+  || { echo "✘ tests failed, see build/test.log"; exit 1; }
+grep -E "Test run with" build/test.log | tail -1
+
+echo "▶ Release build"
+xcodebuild -project LANNudge.xcodeproj -scheme LANNudge -configuration Release \
+  -derivedDataPath build/ReleaseDerivedData.noindex build > build/release.log 2>&1 \
+  || { echo "✘ build failed, see build/release.log"; exit 1; }
+
+app=build/ReleaseDerivedData.noindex/Build/Products/Release/LANNudge.app
+codesign --verify --deep --strict "$app"
+plist="$app/Contents/Info.plist"
+version="$(plutil -extract CFBundleShortVersionString raw "$plist")-$(plutil -extract CFBundleVersion raw "$plist")"
+display="$(plutil -extract CFBundleDisplayName raw "$plist")"
+
+bg=build/dmg-background.tiff
+swiftc -O scripts/make-dmg-background.swift -o build/make-dmg-background
+build/make-dmg-background build/dmg-bg.png 1
+build/make-dmg-background build/dmg-bg@2x.png 2
+tiffutil -cathidpicheck build/dmg-bg.png build/dmg-bg@2x.png -out "$bg" >/dev/null 2>&1
+
+stage=build/dmg.noindex
+rm -rf "$stage" && mkdir -p "$stage"
+ditto "$app" "$stage/$display.app"
+dmg="release/LANNudge-$version.dmg"
+rm -f "$dmg"
+# Icon positions must match scripts/make-dmg-background.swift.
+create-dmg --volname "$display" --background "$bg" --window-pos 200 120 --window-size 640 400 \
+  --icon-size 128 --text-size 13 --icon "$display.app" 160 180 --hide-extension "$display.app" \
+  --app-drop-link 480 180 --filesystem HFS+ --format UDZO --hdiutil-quiet "$dmg" "$stage" >/dev/null
+rm -rf "$stage"
+echo "✔ $dmg ($(du -h "$dmg" | cut -f1))"
+
+for f in release/*(N); do
+  [[ $f == "$dmg" ]] || { rm -f "$f"; echo "  removed old $f"; }
+done

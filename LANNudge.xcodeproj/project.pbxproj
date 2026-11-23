@@ -16,6 +16,7 @@
 		42475273DFB063973B9F3D54 /* OverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5622ADB04909C1B953FF113 /* OverlayController.swift */; };
 		4514118EF9DDF1ECFDBF7CE0 /* ReceiveGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB9C7AD79105949F9879ED1 /* ReceiveGateTests.swift */; };
 		4D0D5BDE8105D12181FC3666 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAD012FA7C27799249D50E5F /* AppModel.swift */; };
+		591BDF2A5A219CAA8674FA58 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 50713D6661AFC302BC8BF45B /* Assets.xcassets */; };
 		62DE1F7A7B176A5A788278C1 /* NudgeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5686A9AFA0A1A9619FAE8494 /* NudgeView.swift */; };
 		67A91A31D404FD7D92177F86 /* ProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01082B9C1E1B9B17961BCAAD /* ProtocolTests.swift */; };
 		930B277BAD478F69595F51F1 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9317213E6A7439E68FEAC001 /* SettingsView.swift */; };
@@ -45,6 +46,7 @@
 		29A5F3091C7A3354B395B7B8 /* OverlayPlacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayPlacementTests.swift; sourceTree = "<group>"; };
 		2D092F7D48001727B7B90AC0 /* ReceiveGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiveGate.swift; sourceTree = "<group>"; };
 		47562DB5D519568C5D6E8868 /* Identity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Identity.swift; sourceTree = "<group>"; };
+		50713D6661AFC302BC8BF45B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		5686A9AFA0A1A9619FAE8494 /* NudgeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NudgeView.swift; sourceTree = "<group>"; };
 		7A36599CA4BF33858469B2D6 /* PeerNetwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeerNetwork.swift; sourceTree = "<group>"; };
 		9317213E6A7439E68FEAC001 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -105,6 +107,7 @@
 			isa = PBXGroup;
 			children = (
 				CAD012FA7C27799249D50E5F /* AppModel.swift */,
+				50713D6661AFC302BC8BF45B /* Assets.xcassets */,
 				47562DB5D519568C5D6E8868 /* Identity.swift */,
 				94D028BA01224165E4BA7515 /* Info.plist */,
 				21123F621134C12F5722BEFC /* LANNudge.entitlements */,
@@ -147,6 +150,7 @@
 			buildConfigurationList = 9DC977C93BF1F00E86257AA2 /* Build configuration list for PBXNativeTarget "LANNudge" */;
 			buildPhases = (
 				AAF7B315154BA181072404CB /* Sources */,
+				ACC4558EB7D4894C52719A1E /* Resources */,
 				FD926B9FBE9E0591D2467CBA /* Frameworks */,
 			);
 			buildRules = (
@@ -202,6 +206,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		ACC4558EB7D4894C52719A1E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				591BDF2A5A219CAA8674FA58 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		AAF7B315154BA181072404CB /* Sources */ = {
@@ -267,6 +282,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = LANNudge/LANNudge.entitlements;
+				CODE_SIGN_INJECT_BASE_ENTITLEMENTS = NO;
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = LANNudge/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -315,7 +331,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -330,7 +346,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.2.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -411,7 +427,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -432,7 +448,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.2.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
