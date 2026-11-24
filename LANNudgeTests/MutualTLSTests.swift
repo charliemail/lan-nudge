@@ -20,8 +20,10 @@ struct MutualTLSTests {
 
         let receiver = PeerNetwork(identity: b, displayName: "B", advertise: false)
         var seenSender: String?
+        var seenCheck: RequestCheck?
         receiver.onRequest = { sender, check in
             seenSender = sender
+            seenCheck = check
             return check.id == nil ? nil : .displayed
         }
         receiver.startListener()
@@ -38,6 +40,10 @@ struct MutualTLSTests {
 
         // No pairing: the receiver accepts any client but learns its certificate fingerprint.
         #expect(await sender.send(.shake, to: peer(hint: b.fingerprint, [endpoint])) == .ack(.displayed))
+        #expect(await sender.send(.knock, message: "來開會了", to: peer(hint: b.fingerprint, [endpoint])) == .ack(.displayed))
+        guard case .valid(_, .knock, "來開會了", true)? = seenCheck else {
+            Issue.record("message did not arrive: \(String(describing: seenCheck))"); return
+        }
         #expect(seenSender == a.fingerprint)
 
         // A Bonjour record claiming another device's hint can't redirect the nudge.

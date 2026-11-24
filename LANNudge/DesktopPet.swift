@@ -14,7 +14,9 @@ final class DesktopPet {
     }
 
     static let height: CGFloat = 180
-    static let captionHeight: CGFloat = 44
+    /// Room for the sender line plus a 60-character message wrapped to three lines.
+    static let captionHeight: CGFloat = 100
+    static let minWidth: CGFloat = 260
 
     var enabled: Bool {
         didSet { defaults.set(enabled, forKey: "petEnabled"); refresh() }
@@ -61,22 +63,31 @@ final class DesktopPet {
         refresh()
     }
 
-    /// Plays the shock pose instead of the overlay. False when the pet isn't on the current
-    /// Space (e.g. a full-screen app), so the caller can fall back to the overlay.
-    func shock(from sender: String) -> Bool {
-        guard let panel, panel.isOnActiveSpace, !isShocking, let shock = images[.shock] else { return false }
+    /// One loop of the shock GIF, or nil when the pet can't react here (turned off, or not on the
+    /// current Space, e.g. a full-screen app), so the caller falls back to the overlay.
+    var shockLoop: Double? {
+        guard let panel, panel.isOnActiveSpace, !isShocking, let shock = images[.shock] else { return nil }
+        return Self.playDuration(of: shock)
+    }
+
+    /// Shock pose for `animateFor` seconds, then idle again while the caption stays up to `showFor`.
+    func shock(_ caption: PetCaption.Content, animateFor: Double, showFor: Double) -> Bool {
+        guard shockLoop != nil, let panel, let shock = images[.shock], let idle = images[.idle] else { return false }
         isShocking = true
-        panel.show(shock, caption: "\(sender) 戳了你一下")
+        panel.setImage(shock)
+        panel.setCaption(caption)
         Sounds.play(.cartoonShock)
         Task {
-            try? await Task.sleep(for: .seconds(Self.playDuration(of: shock)))
+            try? await Task.sleep(for: .seconds(animateFor))
+            panel.setImage(idle)
+            try? await Task.sleep(for: .seconds(max(showFor - animateFor, 0)))
+            panel.setCaption(nil)
             isShocking = false
-            if let idle = images[.idle] { self.panel?.show(idle, caption: nil) }
         }
         return true
     }
 
-    /// One full loop of the GIF, clamped so a long GIF can't hold the "busy" slot (no queue) for long.
+    /// One full loop of the GIF, clamped so a long GIF can't hold the screen for long.
     nonisolated static func playDuration(of image: NSImage) -> Double {
         guard let rep = image.representations.first as? NSBitmapImageRep,
               let frames = rep.value(forProperty: .frameCount) as? Int, frames > 1 else { return 2 }
@@ -109,7 +120,7 @@ final class DesktopPet {
             return
         }
         let panel = self.panel ?? PetPanel(autosaveName: autosaveName)
-        panel.show(idle, caption: nil)
+        if !isShocking { panel.setImage(idle) }
         panel.orderFrontRegardless()
         self.panel = panel
     }
@@ -119,7 +130,7 @@ final class DesktopPet {
 /// clicks so it can be dragged; the window server still passes clicks through fully transparent pixels.
 private final class PetPanel: NSPanel {
     private let imageView = DraggableImageView()
-    private let caption = NSHostingView(rootView: PetCaption(text: ""))
+    private let caption = NSHostingView(rootView: PetCaption(content: .init(sender: "", message: nil, waiting: 0)))
 
     init(autosaveName: String) {
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -142,24 +153,27 @@ private final class PetPanel: NSPanel {
 
         // Default spot: bottom-right of the primary screen; a saved (dragged) position wins.
         if let visible = NSScreen.screens.first?.visibleFrame {
-            setFrame(OverlayController.frame(size: CGSize(width: 140, height: DesktopPet.height + DesktopPet.captionHeight),
+            setFrame(OverlayController.frame(size: CGSize(width: DesktopPet.minWidth, height: DesktopPet.height + DesktopPet.captionHeight),
                                              in: visible), display: false)
         }
         setFrameAutosaveName(autosaveName)
     }
 
-    /// Sized from the idle GIF's aspect ratio; the caption strip sits under the character.
-    func show(_ image: NSImage, caption text: String?) {
+    /// Sized from the image's aspect ratio; the caption strip sits under the character.
+    func setImage(_ image: NSImage) {
         let width = (DesktopPet.height * image.size.width / max(image.size.height, 1)).rounded()
-        let size = CGSize(width: max(width, 220), height: DesktopPet.height + DesktopPet.captionHeight)
+        let size = CGSize(width: max(width, DesktopPet.minWidth), height: DesktopPet.height + DesktopPet.captionHeight)
         if frame.size != size {
             setFrame(CGRect(x: frame.midX - size.width / 2, y: frame.minY, width: size.width, height: size.height), display: true)
         }
         imageView.frame = CGRect(x: 0, y: DesktopPet.captionHeight, width: size.width, height: DesktopPet.height)
         caption.frame = CGRect(x: 0, y: 0, width: size.width, height: DesktopPet.captionHeight)
         imageView.image = image
-        caption.rootView = PetCaption(text: text ?? "")
-        caption.isHidden = text == nil
+    }
+
+    func setCaption(_ content: PetCaption.Content?) {
+        if let content { caption.rootView = PetCaption(content: content) }
+        caption.isHidden = content == nil
     }
 
     override var canBecomeKey: Bool { false }
@@ -170,17 +184,33 @@ private final class DraggableImageView: NSImageView {
     override var mouseDownCanMoveWindow: Bool { true }
 }
 
-private struct PetCaption: View {
-    let text: String
+struct PetCaption: View {
+    struct Content: Equatable {
+        let sender: String
+        let message: String?
+        /// Nudges still queued behind this one.
+        let waiting: Int
+    }
+
+    let content: Content
 
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "bolt.fill").foregroundStyle(.yellow)
-            Text(text).font(.headline).lineLimit(1)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "bolt.fill").foregroundStyle(.yellow)
+                Text("\(content.sender) 戳了你一下").font(.headline).lineLimit(1)
+                if content.waiting > 0 {
+                    Text("還有 \(content.waiting) 則").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            if let message = content.message {
+                Text(message).font(.body).lineLimit(3).fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }

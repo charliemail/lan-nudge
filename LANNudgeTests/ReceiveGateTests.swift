@@ -74,4 +74,59 @@ struct ReceiveGateTests {
         // `first` was evicted, so it is decided again instead of replaying `.muted`.
         #expect(gate.decide(sender: alice, id: first, now: t0.addingTimeInterval(4), muted: false, busy: false) { true } == .displayed)
     }
+
+    @Test func busyQueuesOnlyForSendersThatCanReadQueued() {
+        var gate = ReceiveGate()
+        var queue = NudgeQueue<Int>()
+        _ = gate.decide(sender: alice, id: UUID(), now: t0, muted: false, busy: false) { true }
+        let new = gate.decide(sender: bob, id: UUID(), now: t0.addingTimeInterval(1), muted: false, busy: true,
+                              acceptsQueued: true, enqueue: { queue.add(1, from: bob) }) { true }
+        let old = gate.decide(sender: "C", id: UUID(), now: t0.addingTimeInterval(1), muted: false, busy: true,
+                              acceptsQueued: false, enqueue: { queue.add(2, from: "C") }) { true }
+        #expect([new, old] == [.queued, .rateLimited])
+        #expect(queue.count == 1)
+    }
+
+    @Test func queuedCountsTowardSenderIntervalAndResendStaysQueued() {
+        var gate = ReceiveGate()
+        let id = UUID()
+        #expect(gate.decide(sender: bob, id: id, now: t0, muted: false, busy: true, acceptsQueued: true, enqueue: { true }) { true } == .queued)
+        #expect(gate.decide(sender: bob, id: id, now: t0.addingTimeInterval(1), muted: false, busy: false) { true } == .queued)
+        #expect(gate.decide(sender: bob, id: UUID(), now: t0.addingTimeInterval(2), muted: false, busy: false) { true } == .rateLimited)
+    }
+
+    @Test func fullQueueTurnsAway() {
+        var gate = ReceiveGate()
+        #expect(gate.decide(sender: bob, id: UUID(), now: t0, muted: false, busy: true, acceptsQueued: true, enqueue: { false }) { true } == .rateLimited)
+    }
+
+    @Test func queueIsBoundedFifoWithOnePerSender() {
+        var queue = NudgeQueue<String>()
+        let added = [("a1", "a"), ("a2", "a"), ("b", "b"), ("c", "c"), ("d", "d"), ("e", "e"), ("f", "f")]
+            .map { queue.add($0.0, from: $0.1) }
+        #expect(added == [true, false, true, true, true, true, false])
+        let first = queue.next()
+        let readded = queue.add("a2", from: "a")
+        let second = queue.next()
+        #expect(first == "a1" && readded && second == "b")
+        queue.removeAll()
+        let empty = queue.next()
+        #expect(empty == nil)
+    }
+}
+
+struct DisplayTimeTests {
+    @Test func automatic() {
+        #expect(AppModel.durations(custom: nil, message: nil, animation: 1.4) == (1.4, 1.4))
+        #expect(AppModel.durations(custom: nil, message: "短", animation: 1.4) == (1.4, 3))
+        #expect(AppModel.durations(custom: nil, message: String(repeating: "字", count: 30), animation: 2) == (2, 6))
+        #expect(AppModel.durations(custom: nil, message: String(repeating: "字", count: 60), animation: 2) == (2, 8))
+    }
+
+    @Test func customAppliesToEverythingAndIsClamped() {
+        #expect(AppModel.durations(custom: 10, message: nil, animation: 1.4) == (10, 10))
+        #expect(AppModel.durations(custom: 10, message: "嗨", animation: 2) == (10, 10))
+        #expect(AppModel.durations(custom: 1, message: nil, animation: 2) == (2, 2))
+        #expect(AppModel.durations(custom: 99, message: nil, animation: 2) == (15, 15))
+    }
 }

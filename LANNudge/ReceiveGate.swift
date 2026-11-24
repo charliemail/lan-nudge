@@ -15,11 +15,15 @@ struct ReceiveGate {
     private var results: [Key: AckStatus] = [:]
     /// Insertion order for expiry/eviction.
     private var order: [(key: Key, at: Date)] = []
-    private var lastDisplayed: [String: Date] = [:]
+    /// Accepted = displayed or queued; the per-sender interval counts from either.
+    private var lastAccepted: [String: Date] = [:]
 
-    /// `present` is only called when every rule passes; it returns false when nothing could be shown
-    /// (display asleep, locked, overlay busy) and the request is answered `unavailable`.
+    /// `present` is only called when every rule passes and nothing is on screen; it returns false
+    /// when nothing could be shown (display asleep, locked) and the request is answered `unavailable`.
+    /// While busy, `enqueue` decides whether the request waits (`queued`) or is turned away.
+    /// Senders that can't read `queued` (`acceptsQueued == false`) get the pre-0.4.0 `rateLimited`.
     mutating func decide(sender: String, id: UUID, now: Date, muted: Bool, busy: Bool,
+                         acceptsQueued: Bool = false, enqueue: () -> Bool = { false },
                          present: () -> Bool) -> AckStatus {
         prune(now: now)
         let key = Key(sender: sender, id: id)
@@ -28,13 +32,14 @@ struct ReceiveGate {
         let status: AckStatus
         if muted {
             status = .muted
-        } else if let last = lastDisplayed[sender], now.timeIntervalSince(last) < perSenderInterval {
+        } else if let last = lastAccepted[sender], now.timeIntervalSince(last) < perSenderInterval {
             status = .rateLimited
         } else if busy {
-            status = .rateLimited
+            status = acceptsQueued && enqueue() ? .queued : .rateLimited
+            if status == .queued { lastAccepted[sender] = now }
         } else if present() {
             status = .displayed
-            lastDisplayed[sender] = now
+            lastAccepted[sender] = now
         } else {
             status = .unavailable
         }
@@ -52,4 +57,23 @@ struct ReceiveGate {
             order.removeFirst()
         }
     }
+}
+
+/// Nudges waiting for the screen. Bounded, at most one per sender so one person can't fill it,
+/// first in first out.
+struct NudgeQueue<Item> {
+    var capacity = 5
+    private var items: [(sender: String, item: Item)] = []
+
+    var count: Int { items.count }
+
+    mutating func add(_ item: Item, from sender: String) -> Bool {
+        guard items.count < capacity, !items.contains(where: { $0.sender == sender }) else { return false }
+        items.append((sender, item))
+        return true
+    }
+
+    mutating func next() -> Item? { items.isEmpty ? nil : items.removeFirst().item }
+
+    mutating func removeAll() { items.removeAll() }
 }

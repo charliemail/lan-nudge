@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    let model: AppModel
+    @Bindable var model: AppModel
     @State private var name = ""
     @State private var axTrusted = WindowShaker.isTrusted
 
@@ -41,6 +41,28 @@ struct SettingsView: View {
                 ForEach(model.peers) { Text(model.label(for: $0)) }
                 if let problem = model.networkProblem {
                     Text(problem).foregroundStyle(.orange)
+                }
+            }
+
+            Section("接收") {
+                Toggle("顯示對方附帶的訊息", isOn: $model.showMessages)
+                Picker("提醒顯示時間", selection: displayMode) {
+                    Text("自動").tag(false)
+                    Text("自訂").tag(true)
+                }
+                .pickerStyle(.segmented)
+                if let seconds = model.customDisplaySeconds {
+                    HStack {
+                        Slider(value: Binding(get: { Double(seconds) }, set: { model.customDisplaySeconds = Int($0.rounded()) }),
+                               in: Double(AppModel.displayRange.lowerBound)...Double(AppModel.displayRange.upperBound), step: 1)
+                        Text("\(seconds) 秒").monospacedDigit().frame(width: 44, alignment: .trailing)
+                        Button("還原預設") { model.customDisplaySeconds = nil }
+                    }
+                    Text("每則提醒都顯示這麼久。顯示期間別人再戳你會排隊（最多 5 則），設越長等越久。")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text("沒附訊息：提醒小窗 2 秒，桌面寵物播一輪動畫。附訊息：3 秒加上每 10 字 1 秒，最長 8 秒。")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
 
@@ -89,6 +111,11 @@ struct SettingsView: View {
                 try? await Task.sleep(for: .seconds(1))
             }
         }
+    }
+
+    private var displayMode: Binding<Bool> {
+        Binding(get: { model.customDisplaySeconds != nil },
+                set: { model.customDisplaySeconds = $0 ? (model.customDisplaySeconds ?? 5) : nil })
     }
 
     private func save() {

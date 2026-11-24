@@ -52,7 +52,41 @@ struct RequestCheckTests {
 
     @Test func validRequest() throws {
         let payload = try JSONEncoder().encode(NudgeRequest(id: id, effect: .cartoonShock))
-        #expect(RequestCheck(payload) == .valid(id: id, effect: .cartoonShock))
+        #expect(RequestCheck(payload) == .valid(id: id, effect: .cartoonShock, message: nil, acceptsQueued: true))
+        #expect(!String(decoding: payload, as: UTF8.self).contains("message"))
+    }
+
+    @Test func requestWithMessage() throws {
+        let payload = try JSONEncoder().encode(NudgeRequest(id: id, effect: .knock, message: "來開會了"))
+        #expect(RequestCheck(payload) == .valid(id: id, effect: .knock, message: "來開會了", acceptsQueued: true))
+    }
+
+    /// Pre-0.4.0 senders send neither key: no message, and they can't read a `queued` ack.
+    @Test func oldSenderFormat() {
+        #expect(RequestCheck(json(["version": 1, "type": "nudge", "id": id.uuidString, "effect": "shake"]))
+                == .valid(id: id, effect: .shake, message: nil, acceptsQueued: false))
+    }
+
+    /// The receiver cleans the text itself instead of trusting the sender.
+    @Test func receivedMessageIsSanitized() {
+        let raw = "第一行\n第二行\u{202E}反轉\t" + String(repeating: "字", count: 80)
+        guard case .valid(_, _, let message?, _) = RequestCheck(json(["version": 1, "type": "nudge", "id": id.uuidString,
+                                                                     "effect": "shake", "message": raw])) else {
+            Issue.record("expected a message"); return
+        }
+        #expect(!message.contains("\n") && !message.contains("\u{202E}") && !message.contains("\t"))
+        #expect(message.hasPrefix("第一行 第二行 反轉 字"))
+        #expect(message.count == NudgeMessage.maxLength)
+    }
+
+    @Test func sanitizeEdgeCases() {
+        #expect(NudgeMessage.sanitize(nil) == nil)
+        #expect(NudgeMessage.sanitize(" \n\t ") == nil)
+        #expect(NudgeMessage.sanitize("  hi   there ") == "hi there")
+        // A family emoji is one character (joined with ZWJ, which is kept).
+        let family = "👨‍👩‍👧"
+        #expect(NudgeMessage.sanitize(String(repeating: family, count: 70))?.count == 60)
+        #expect(NudgeMessage.sanitize(family) == family)
     }
 
     @Test func unknownVersionIsInvalidWithID() {

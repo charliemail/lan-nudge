@@ -21,6 +21,7 @@ enum SendOutcome: Equatable {
     var message: String {
         switch self {
         case .ack(.displayed): "已觸發"
+        case .ack(.queued): "已排隊，對方看完前一則就會顯示"
         case .ack(.muted): "對方暫停接收"
         case .ack(.rateLimited): "請稍後再試"
         case .ack(.unavailable): "對方目前無法顯示提醒"
@@ -219,8 +220,8 @@ final class PeerNetwork {
 
     /// The receiver must present a certificate whose fingerprint starts with the peer's advertised
     /// hint, so a spoofed Bonjour record can't redirect the nudge to another machine.
-    func send(_ effect: Effect, to peer: Peer) async -> SendOutcome {
-        let request = NudgeRequest(id: UUID(), effect: effect)
+    func send(_ effect: Effect, message: String? = nil, to peer: Peer) async -> SendOutcome {
+        let request = NudgeRequest(id: UUID(), effect: effect, message: message)
         return await withCheckedContinuation { continuation in
             SendAttempt(request: request, continuation: continuation).start(peer.candidates) { [identity] in
                 TLSSetup.parameters(identity: identity) { $0.hasPrefix(peer.hint) }

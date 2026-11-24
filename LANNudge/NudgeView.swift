@@ -3,6 +3,8 @@ import SwiftUI
 struct NudgeView: View {
     let effect: Effect
     let sender: String
+    let message: String?
+    let waiting: Int
     let reduceMotion: Bool
     @State private var start = Date()
 
@@ -30,9 +32,19 @@ struct NudgeView: View {
             case .shake: Image(systemName: "hand.point.right.fill").foregroundStyle(.yellow)
             case .knock: Image(systemName: "hand.raised.fill").foregroundStyle(.brown)
             }
-            Text(effect == .knock ? "\(sender) 在敲你的門" : "\(sender) 戳了你一下")
-                .font(.headline)
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(effect == .knock ? "\(sender) 在敲你的門" : "\(sender) 戳了你一下")
+                        .font(.headline)
+                        .lineLimit(1)
+                    if waiting > 0 {
+                        Text("還有 \(waiting) 則").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                if let message {
+                    Text(message).font(.body).lineLimit(3).fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

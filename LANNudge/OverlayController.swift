@@ -4,23 +4,26 @@ import SwiftUI
 @MainActor
 final class OverlayController {
     static let shared = OverlayController()
-    static let panelSize = CGSize(width: 280, height: 210)
-    /// Longer than the spec's ~1 s: at 1.2 s the shock was gone before people noticed it.
-    static let duration: Duration = .seconds(2)
+    /// Tall enough for a three-line message under the animation; the panel is transparent and click-through.
+    static let panelSize = CGSize(width: 300, height: 270)
+    /// Default without a message. Longer than the spec's ~1 s: at 1.2 s the shock was gone before
+    /// people noticed it.
+    static let defaultDuration = 2.0
 
     private var panel: NSPanel?
     var isShowing: Bool { panel != nil }
 
     /// Returns false when another overlay is still on screen; the spec forbids queueing.
     @discardableResult
-    func show(_ effect: Effect, from sender: String) -> Bool {
+    func show(_ effect: Effect, from sender: String, message: String?, waiting: Int, duration: Double) -> Bool {
         guard panel == nil else { return false }
         let screens = NSScreen.screens.map { (frame: $0.frame, visible: $0.visibleFrame) }
         guard let visible = Self.visibleFrame(for: NSEvent.mouseLocation, screens: screens) else { return false }
 
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         let panel = OverlayPanel(contentRect: Self.frame(size: Self.panelSize, in: visible))
-        panel.contentView = NSHostingView(rootView: NudgeView(effect: effect, sender: sender, reduceMotion: reduceMotion))
+        panel.contentView = NSHostingView(rootView: NudgeView(effect: effect, sender: sender, message: message, waiting: waiting,
+                                                                reduceMotion: reduceMotion))
         panel.orderFrontRegardless()
         Sounds.play(effect)
         // The overlay label still names the sender; the real window shake is best-effort on top.
@@ -28,7 +31,7 @@ final class OverlayController {
         self.panel = panel
 
         Task {
-            try? await Task.sleep(for: Self.duration)
+            try? await Task.sleep(for: .seconds(duration))
             panel.orderOut(nil)
             panel.contentView = nil
             self.panel = nil

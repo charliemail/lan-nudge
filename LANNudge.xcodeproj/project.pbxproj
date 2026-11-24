@@ -11,6 +11,7 @@
 		110D08E4F7606E04EEE57E91 /* OverlayPlacementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29A5F3091C7A3354B395B7B8 /* OverlayPlacementTests.swift */; };
 		1297DE5E1E8B89D6DA1FD0DE /* MutualTLSTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C6995B00213FEF3626DD244 /* MutualTLSTests.swift */; };
 		2553DDA9F5AFE0A243E4FD4B /* Pet-idle.gif in Resources */ = {isa = PBXBuildFile; fileRef = D784E0B772C3A5B6E04C02A0 /* Pet-idle.gif */; };
+		2989F4F60D5316235D3046F6 /* ComposeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18391F28003CB4F55F212096 /* ComposeView.swift */; };
 		2FD8DF29DBA3877B28A1276E /* LANNudgeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4820B770254988E114E609C /* LANNudgeApp.swift */; };
 		34120478526571EB49DF6E82 /* WindowShaker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16A6B6CE832952D5F566B23B /* WindowShaker.swift */; };
 		39AD4F744520C93AE56FA626 /* Pet-shock.gif in Resources */ = {isa = PBXBuildFile; fileRef = AB1BC42DB5ED0D832A1761AD /* Pet-shock.gif */; };
@@ -46,6 +47,7 @@
 		01082B9C1E1B9B17961BCAAD /* ProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolTests.swift; sourceTree = "<group>"; };
 		0E1F77CCA0975AFE234B4865 /* DesktopPet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPet.swift; sourceTree = "<group>"; };
 		16A6B6CE832952D5F566B23B /* WindowShaker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowShaker.swift; sourceTree = "<group>"; };
+		18391F28003CB4F55F212096 /* ComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeView.swift; sourceTree = "<group>"; };
 		1C6995B00213FEF3626DD244 /* MutualTLSTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MutualTLSTests.swift; sourceTree = "<group>"; };
 		1EC478D778C8D1C74AC14CE1 /* LANNudge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LANNudge.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		206FAA4623B47A400586890B /* Licenses.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = Licenses.txt; sourceTree = "<group>"; };
@@ -119,6 +121,7 @@
 			children = (
 				CAD012FA7C27799249D50E5F /* AppModel.swift */,
 				50713D6661AFC302BC8BF45B /* Assets.xcassets */,
+				18391F28003CB4F55F212096 /* ComposeView.swift */,
 				0E1F77CCA0975AFE234B4865 /* DesktopPet.swift */,
 				47562DB5D519568C5D6E8868 /* Identity.swift */,
 				94D028BA01224165E4BA7515 /* Info.plist */,
@@ -242,6 +245,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D0D5BDE8105D12181FC3666 /* AppModel.swift in Sources */,
+				2989F4F60D5316235D3046F6 /* ComposeView.swift in Sources */,
 				B92253D1F6845B790F64D0E8 /* DesktopPet.swift in Sources */,
 				B86D86D4B2B4329A4FBFEE93 /* Identity.swift in Sources */,
 				2FD8DF29DBA3877B28A1276E /* LANNudgeApp.swift in Sources */,
@@ -351,7 +355,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -366,7 +370,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -447,7 +451,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -468,7 +472,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

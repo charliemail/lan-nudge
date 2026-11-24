@@ -21,15 +21,40 @@ enum Wire {
     static let deadline: Duration = .seconds(5)
 }
 
+/// `message` and `acceptsQueued` are optional additions to version 1: receivers before 0.4.0 ignore
+/// unknown keys, so the version stays 1 and old and new copies interoperate.
 struct NudgeRequest: Codable, Equatable {
     var version = Wire.version
     var type = "nudge"
     let id: UUID
     let effect: Effect
+    var message: String?
+    /// Senders before 0.4.0 can't decode a `queued` ack (they'd report "no ack"), so the receiver
+    /// only queues requests that set this.
+    var acceptsQueued = true
 }
 
 enum AckStatus: String, Codable, Sendable {
-    case displayed, muted, rateLimited, unavailable, invalid
+    case displayed, queued, muted, rateLimited, unavailable, invalid
+}
+
+enum NudgeMessage {
+    static let maxLength = 60
+
+    /// Applied on both ends; the receiver never trusts the sender's copy. Control characters
+    /// (newlines included) and bidi overrides become spaces so a message can't break the layout
+    /// or display reversed text; length counts user-perceived characters.
+    static func sanitize(_ text: String?) -> String? {
+        guard let text else { return nil }
+        let cleaned = String(String.UnicodeScalarView(text.unicodeScalars.map {
+            // Not CharacterSet.controlCharacters: it also holds format characters such as the ZWJ
+            // that joins emoji sequences.
+            $0.properties.generalCategory == .control || (0x202A...0x202E).contains($0.value)
+                || (0x2066...0x2069).contains($0.value) ? " " : $0
+        }))
+        let collapsed = cleaned.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return collapsed.isEmpty ? nil : String(collapsed.prefix(maxLength))
+    }
 }
 
 struct Ack: Codable, Equatable {
@@ -42,13 +67,13 @@ struct Ack: Codable, Equatable {
 /// Outcome of parsing an incoming payload. Unknown versions/effects still yield the id when it is
 /// readable, so the sender gets an `invalid` ack instead of a silent drop.
 enum RequestCheck: Equatable {
-    case valid(id: UUID, effect: Effect)
+    case valid(id: UUID, effect: Effect, message: String?, acceptsQueued: Bool)
     case invalid(id: UUID)
     case unreadable
 
     var id: UUID? {
         switch self {
-        case .valid(let id, _), .invalid(let id): id
+        case .valid(let id, _, _, _), .invalid(let id): id
         case .unreadable: nil
         }
     }
@@ -59,6 +84,8 @@ enum RequestCheck: Equatable {
             let type: String?
             let id: UUID?
             let effect: String?
+            let message: String?
+            let acceptsQueued: Bool?
         }
         guard let loose = try? JSONDecoder().decode(Loose.self, from: payload), let id = loose.id else {
             self = .unreadable
@@ -69,7 +96,8 @@ enum RequestCheck: Equatable {
             self = .invalid(id: id)
             return
         }
-        self = .valid(id: id, effect: effect)
+        self = .valid(id: id, effect: effect, message: NudgeMessage.sanitize(loose.message),
+                      acceptsQueued: loose.acceptsQueued ?? false)
     }
 }
 

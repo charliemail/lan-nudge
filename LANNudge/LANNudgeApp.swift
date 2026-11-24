@@ -14,6 +14,13 @@ struct LANNudgeApp: App {
         }
         .windowResizability(.contentSize)
         .defaultLaunchBehavior(model.needsSetup ? .presented : .suppressed)
+
+        Window("附帶訊息", id: "compose") {
+            ComposeView(model: model)
+        }
+        .windowResizability(.contentSize)
+        .defaultLaunchBehavior(.suppressed)
+        .restorationBehavior(.disabled)
     }
 }
 
@@ -33,6 +40,12 @@ private struct MenuContent: View {
                 Menu(model.label(for: peer)) {
                     ForEach(Effect.allCases, id: \.self) { effect in
                         Button(effect.title) { model.nudge(peer, with: effect) }
+                    }
+                    Divider()
+                    Button("附帶訊息…") {
+                        model.composeTarget = peer
+                        openWindow(id: "compose")
+                        NSApp.activate()
                     }
                 }
             }
