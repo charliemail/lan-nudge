@@ -8,10 +8,16 @@ final class CubiChannel: @unchecked Sendable {
     /// What Cubi accepts for `title`/`from` (ServiceProtocol.titleLimit) and for `log` text.
     static let nameLimit = 40
     static let logLimit = 200
+    /// The app's message limit (NudgeMessage.maxLength).
+    static let messageLimit = 60
     /// How long a nudge waits for Cubi to say whether it drew the overlay.
     static let presentWait: TimeInterval = 1.5
     /// Cubi drops a longer line whole (ServiceProtocol.lineLimit), newline not counted.
     static let lineLimit = 16_384
+
+    /// Cubi's `presented`: drawn, another overlay is up (try again soon), or it cannot draw now
+    /// (screen locked or asleep; also no answer in time).
+    enum Presented: Equatable { case shown, busy, unavailable }
 
     struct Call: Equatable {
         let id: Int
@@ -24,7 +30,7 @@ final class CubiChannel: @unchecked Sendable {
     private var nextPresent = 0
     private var waiting: [Int: (DispatchSemaphore, Box)] = [:]
 
-    private final class Box: @unchecked Sendable { var shown: Bool? }
+    private final class Box: @unchecked Sendable { var answer: Presented? }
 
     init(output: @escaping (Data) -> Void = { FileHandle.standardOutput.write($0) }) {
         self.output = output
@@ -49,22 +55,29 @@ final class CubiChannel: @unchecked Sendable {
         emit(["type": "reply", "id": id, "ok": ok, "out": out])
     }
 
-    /// Asks Cubi to draw the overlay and waits up to `presentWait` for its answer. Blocks the
-    /// caller: LAN Nudge's PeerNetwork answers a request synchronously, so the answer must be known
-    /// before returning. Nothing else of the helper's runs meanwhile but the stdin reader.
-    func present(effect: String, from: String, windowShaken: Bool) -> Bool {
+    /// Asks Cubi to draw the overlay for `seconds` and waits up to `presentWait` for its answer.
+    /// Blocks the caller: LAN Nudge's PeerNetwork answers a request synchronously, so the answer
+    /// must be known before returning. Nothing else of the helper's runs meanwhile but the stdin reader.
+    func present(effect: String, from: String, message: String? = nil, seconds: TimeInterval, windowShaken: Bool) -> Presented {
         let semaphore = DispatchSemaphore(value: 0), box = Box()
         lock.lock()
         nextPresent += 1
         let id = nextPresent
         waiting[id] = (semaphore, box)
         lock.unlock()
-        emit(["type": "present", "id": id, "effect": effect,
-              "from": Self.plain(from, limit: Self.nameLimit, fallback: "未知裝置"), "windowShaken": windowShaken])
+        var event: [String: Any] = ["type": "present", "id": id, "effect": effect,
+                                    "from": Self.plain(from, limit: Self.nameLimit, fallback: "未知裝置"), "windowShaken": windowShaken,
+                                    // The helper decides how long; it times what follows by the same number.
+                                    "seconds": seconds]
+        // The app's own cleaning leaves line separators and direction marks that Cubi refuses.
+        if let message, case let text = Self.plain(message, limit: Self.messageLimit, fallback: ""), !text.isEmpty {
+            event["message"] = text
+        }
+        emit(event)
         _ = semaphore.wait(timeout: .now() + Self.presentWait)
         lock.lock(); defer { lock.unlock() }
         waiting[id] = nil
-        return box.shown ?? false
+        return box.answer ?? .unavailable
     }
 
     private func emit(_ object: [String: Any]) {
@@ -84,7 +97,7 @@ final class CubiChannel: @unchecked Sendable {
         case "presented":
             lock.lock(); defer { lock.unlock() }
             guard let (semaphore, box) = waiting[id] else { return nil }
-            box.shown = object["ok"] as? Bool == true
+            box.answer = object["ok"] as? Bool == true ? .shown : object["reason"] as? String == "busy" ? .busy : .unavailable
             semaphore.signal()
             return nil
         case "call":

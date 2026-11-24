@@ -8,6 +8,7 @@ import Testing
 
 private final class MemoryNames: NameStore {
     var name: String?
+    var muted = false
 }
 
 private struct NoNetwork: Error {}
@@ -60,6 +61,13 @@ private final class Lines: @unchecked Sendable {
     #expect((lines.states.last?["problem"] as? String ?? "").hasPrefix("鑰匙圈："))
     #expect(lines.states.count <= 2)
 
+    // 暫停接收: kept, and in the state; anything but "true"/"false" refused.
+    #expect(await app.handle(CubiChannel.Call(id: 5, action: "setMuted", args: ["muted": "yes"])).ok == false)
+    let mute = await app.handle(CubiChannel.Call(id: 6, action: "setMuted", args: ["muted": "true"]))
+    #expect(mute.ok && names.muted)
+    try await Task.sleep(for: HelperApp.stateInterval + .milliseconds(300))
+    #expect(lines.states.last?["muted"] as? Bool == true)
+
     // Unknown actions are refused, their name made plain for the answer.
     let other = await app.handle(CubiChannel.Call(id: 4, action: "rm\n-rf", args: [:]))
     #expect(!other.ok && (other.out["error"] as? String)?.contains("\n") == false)
@@ -98,6 +106,7 @@ private final class Lines: @unchecked Sendable {
 private final class MemoryDefaults: StringDefaults {
     var values: [String: Any] = [:]
     func string(forKey key: String) -> String? { values[key] as? String }
+    func bool(forKey key: String) -> Bool { values[key] as? Bool ?? false }
     func set(_ value: Any?, forKey key: String) { values[key] = value }
 }
 
@@ -115,4 +124,24 @@ private final class MemoryDefaults: StringDefaults {
 @Test func theStateCarriesAProblemOnlyWhenThereIsOne() {
     #expect(HelperApp.stateData(name: "alpha", peers: [])["problem"] == nil)
     #expect(HelperApp.stateData(name: "alpha", peers: [], problem: "x")["problem"] as? String == "x")
+}
+
+// Cubi's offline panel picture (`--render-panel --with-service`, CUBI_RENDER=1): the name as the
+// user's store has it, nothing written back to that store, never the network or the keychain.
+@MainActor
+@Test func aDryRunReadsTheNameButNeverStartsTheNetworkOrWrites() async {
+    let lines = Lines(), names = MemoryNames()
+    names.name = "alpha"
+    var asked: [String] = []
+    let app = HelperApp(channel: CubiChannel(output: lines.write), store: MemoryNameStore(copying: names), dryRun: true) { name in
+        asked.append(name); throw NoNetwork()
+    }
+    app.start()
+    #expect(asked.isEmpty && app.service == nil)
+    #expect(lines.states.last?["name"] as? String == "alpha")
+    #expect((app.problem ?? "").hasPrefix("預覽"))
+    // Calls from the panel behave, and change only the copy.
+    #expect(await app.handle(CubiChannel.Call(id: 1, action: "setName", args: ["name": "beta"])).ok)
+    #expect(await app.handle(CubiChannel.Call(id: 2, action: "setMuted", args: ["muted": "true"])).ok)
+    #expect(names.name == "alpha" && !names.muted && asked.isEmpty)
 }

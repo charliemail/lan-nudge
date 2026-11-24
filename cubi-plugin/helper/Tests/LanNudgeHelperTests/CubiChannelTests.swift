@@ -58,20 +58,29 @@ private final class Sink: @unchecked Sendable {
         let id = sink.lines.last?["id"] as? Int ?? -1
         _ = channel.take(Data(#"{"id":\#(id),"ok":true,"type":"presented"}"#.utf8))
     }
-    #expect(channel.present(effect: "knock", from: "\u{202E}alpha", windowShaken: false))
+    // The app's NudgeMessage keeps U+2028 and U+200E; Cubi refuses them, so they go here.
+    let seconds = NudgeService.displaySeconds(message: "開會")
+    #expect(channel.present(effect: "knock", from: "\u{202E}alpha", message: "開\u{2028}會\u{200E}", seconds: seconds, windowShaken: false) == .shown)
     let sent = sink.lines.last
     #expect(sent?["type"] as? String == "present" && sent?["from"] as? String == "alpha" && sent?["effect"] as? String == "knock")
+    #expect(sent?["message"] as? String == "開會")
+    // How long is the helper's to say (F-P2a-2).
+    #expect(sent?["seconds"] as? Double == seconds)
 
-    // Cubi says busy: not shown.
-    DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) {
-        let id = sink.lines.last?["id"] as? Int ?? -1
-        _ = channel.take(Data(#"{"id":\#(id),"ok":false,"reason":"busy","type":"presented"}"#.utf8))
+    // Cubi's two reasons (ServiceProtocol.presentFailures): busy, to try again; unavailable.
+    for (reason, answer) in [("busy", CubiChannel.Presented.busy), ("unavailable", .unavailable)] {
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) {
+            let id = sink.lines.last?["id"] as? Int ?? -1
+            _ = channel.take(Data(#"{"id":\#(id),"ok":false,"reason":"\#(reason)","type":"presented"}"#.utf8))
+        }
+        #expect(channel.present(effect: "zap", from: "alpha", seconds: NudgeService.overlaySeconds, windowShaken: false) == answer)
     }
-    #expect(!channel.present(effect: "zap", from: "alpha", windowShaken: false))
+    // No message, or nothing visible in it: no key at all.
+    #expect(sink.lines.last?["message"] == nil)
 
-    // No answer: not shown, after the wait and not much more.
+    // No answer: taken as unavailable, after the wait and not much more.
     let began = Date()
-    #expect(!channel.present(effect: "shake", from: "alpha", windowShaken: false))
+    #expect(channel.present(effect: "shake", from: "alpha", seconds: NudgeService.overlaySeconds, windowShaken: false) == .unavailable)
     let waited = Date().timeIntervalSince(began)
     #expect(waited >= CubiChannel.presentWait - 0.05 && waited < CubiChannel.presentWait + 1)
 }

@@ -4,11 +4,14 @@ import Foundation
 /// never taken from the Mac (its name often is the owner's real name).
 protocol NameStore: AnyObject {
     var name: String? { get set }
+    /// 暫停接收, kept as the app keeps it.
+    var muted: Bool { get set }
 }
 
 /// What DefaultsNameStore needs of UserDefaults.
 protocol StringDefaults: AnyObject {
     func string(forKey: String) -> String?
+    func bool(forKey: String) -> Bool
     func set(_ value: Any?, forKey: String)
 }
 
@@ -19,16 +22,32 @@ extension UserDefaults: StringDefaults {}
 /// Foundation refuses a suite named after the process's own bundle identifier.
 final class DefaultsNameStore: NameStore {
     static let key = "displayName"
+    static let mutedKey = "muted"
     let defaults: StringDefaults
     init(_ defaults: StringDefaults = UserDefaults.standard) { self.defaults = defaults }
     var name: String? {
         get { defaults.string(forKey: Self.key) }
         set { defaults.set(newValue, forKey: Self.key) }
     }
+    var muted: Bool {
+        get { defaults.bool(forKey: Self.mutedKey) }
+        set { defaults.set(newValue, forKey: Self.mutedKey) }
+    }
+}
+
+/// For a dry run: what the user's store held, read once, then kept in memory only.
+final class MemoryNameStore: NameStore {
+    var name: String?
+    var muted: Bool
+    init(copying store: NameStore) {
+        name = store.name
+        muted = store.muted
+    }
 }
 
 /// The helper once Cubi said hello. Until the user has set a name nothing touches the network or
 /// the keychain, as the app waits for its first-run setup; `state` says `needsName` meanwhile.
+/// In a dry run (Cubi's offline panel picture, `CUBI_RENDER=1`) it never does.
 @MainActor
 final class HelperApp {
     /// `state` at most this often; the last change always goes out.
@@ -37,6 +56,7 @@ final class HelperApp {
     private let channel: CubiChannel
     private let store: NameStore
     private let makeNetwork: (String) throws -> PeerNetwork
+    private let dryRun: Bool
     private(set) var service: NudgeService?
     /// What stops it from working, for the panel to show (the keychain, local network access).
     private(set) var problem: String?
@@ -44,9 +64,10 @@ final class HelperApp {
     private var stateScheduled = false
 
     /// `makeNetwork`: the identity and PeerNetwork for a name; started only once a name is set.
-    init(channel: CubiChannel, store: NameStore, makeNetwork: @escaping (String) throws -> PeerNetwork) {
+    init(channel: CubiChannel, store: NameStore, dryRun: Bool = false, makeNetwork: @escaping (String) throws -> PeerNetwork) {
         self.channel = channel
         self.store = store
+        self.dryRun = dryRun
         self.makeNetwork = makeNetwork
     }
 
@@ -56,15 +77,18 @@ final class HelperApp {
     }
 
     private func startNetwork(_ name: String) {
+        guard !dryRun else { return setProblem("預覽：不上網路、不碰鑰匙圈") }
         if let service {
             service.setDisplayName(name)
             return
         }
         do {
             let network = try makeNetwork(name)
-            service = NudgeService(network: network,
-                                   present: { [channel] in channel.present(effect: $0, from: $1, windowShaken: false) },
-                                   peersChanged: { [weak self] in self?.stateChanged() })
+            let service = NudgeService(network: network,
+                                       present: { [channel] in channel.present(effect: $0, from: $1, message: $2, seconds: $3, windowShaken: false) },
+                                       peersChanged: { [weak self] in self?.stateChanged() })
+            service.setMuted(store.muted)
+            self.service = service
             network.onProblem = { [weak self, channel] problem in
                 if let problem { channel.log(problem) }
                 self?.setProblem(problem)
@@ -86,9 +110,9 @@ final class HelperApp {
 
     /// What Cubi keeps for the panel: whether a name is needed, the name, what is wrong if anything,
     /// and the peers, kept under Cubi's line limit by leaving peers off the end.
-    static func stateData(name: String?, peers: [Peer], problem: String? = nil) -> [String: Any] {
+    static func stateData(name: String?, peers: [Peer], problem: String? = nil, muted: Bool = false) -> [String: Any] {
         var list = NudgeService.list(peers)
-        var data: [String: Any] = ["needsName": name == nil, "peers": list]
+        var data: [String: Any] = ["needsName": name == nil, "muted": muted, "peers": list]
         if let name { data["name"] = name }
         if let problem { data["problem"] = problem }
         while CubiChannel.stateSize(data) > CubiChannel.lineLimit, !list.isEmpty {
@@ -108,7 +132,7 @@ final class HelperApp {
     private func sendState() {
         guard stateDue else { stateScheduled = false; return }
         stateDue = false
-        channel.state(Self.stateData(name: store.name, peers: service?.peers ?? [], problem: problem))
+        channel.state(Self.stateData(name: store.name, peers: service?.peers ?? [], problem: problem, muted: store.muted))
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: Self.stateInterval)
             self?.sendState()
@@ -126,9 +150,16 @@ final class HelperApp {
             startNetwork(name)
             stateChanged()
             return (true, ["name": name])
+        case "setMuted":
+            // "true" or "false": a call's args are strings.
+            guard let raw = call.args["muted"], ["true", "false"].contains(raw) else { return (false, ["error": "muted 要是 true 或 false"]) }
+            store.muted = raw == "true"
+            service?.setMuted(store.muted)
+            stateChanged()
+            return (true, ["muted": store.muted])
         case "send":
             guard let service else { return (false, ["error": "請先設定名稱"]) }
-            return await service.send(peerID: call.args["peer"] ?? "", effect: call.args["effect"] ?? "")
+            return await service.send(peerID: call.args["peer"] ?? "", effect: call.args["effect"] ?? "", message: call.args["message"])
         default:
             return (false, ["error": "不認得的動作 \(CubiChannel.plain(call.action, limit: CubiChannel.nameLimit, fallback: "?"))"])
         }

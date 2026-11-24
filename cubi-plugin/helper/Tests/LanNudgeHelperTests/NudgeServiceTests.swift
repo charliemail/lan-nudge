@@ -33,12 +33,10 @@ struct NudgeServiceTests {
         let b = try LocalIdentity.loadOrCreate(label: Self.labels[1])
 
         // The receiving side: Cubi's answer is whatever `shown` says.
-        var shown = true
-        var asked: [(String, String)] = []
+        var asked: [(effect: String, from: String, message: String?)] = []
         let receiverNetwork = PeerNetwork(identity: b, displayName: "B", advertise: false)
-        let receiver = NudgeService(network: receiverNetwork, present: { effect, from in
-            asked.append((effect, from)); return shown
-        }, peersChanged: {})
+        let receiver = NudgeService(network: receiverNetwork, present: { asked.append(($0, $1, $2)); _ = $3; return .shown }, peersChanged: {})
+        defer { withExtendedLifetime(receiver) {} }
         receiverNetwork.startListener()
         var port: UInt16?
         for _ in 0..<50 where port == nil {
@@ -49,14 +47,17 @@ struct NudgeServiceTests {
 
         // The sending side, with the receiver as its one peer.
         let senderNetwork = PeerNetwork(identity: a, displayName: "A", advertise: false)
-        let sender = NudgeService(network: senderNetwork, present: { _, _ in true }, peersChanged: {})
+        let sender = NudgeService(network: senderNetwork, present: { _, _, _, _ in .shown }, peersChanged: {})
         sender.setPeers([Peer(id: "LANNudge-B", name: "B", hint: Fingerprint.hint(b.fingerprint), candidates: [endpoint])])
 
-        // Over the network: drawn, triggered; an unknown sender is named by its fingerprint, as in the app.
-        var result = await sender.send(peerID: "LANNudge-B", effect: "zap")
+        // Over the network, with a message: drawn, triggered; the message reaches Cubi as the app
+        // cleans it; an unknown sender is named by its fingerprint, as in the app.
+        var result = await sender.send(peerID: "LANNudge-B", effect: "zap", message: " 開會\n囉 ")
         #expect(result.ok && result.out["result"] as? String == SendOutcome.ack(.displayed).message)
-        #expect(asked.count == 1 && asked[0].0 == "zap" && asked[0].1 == "未知裝置（\(a.fingerprint.prefix(4))）")
-        // Right after: rate-limited, and Cubi is not asked again.
+        try #require(asked.count == 1)
+        #expect(asked[0].effect == "zap" && asked[0].message == "開會 囉")
+        #expect(asked[0].from == "未知裝置（\(a.fingerprint.prefix(4))）")
+        // Right after, the same sender: the app's per-sender limit, Cubi not asked.
         result = await sender.send(peerID: "LANNudge-B", effect: "shake")
         #expect(!result.ok && result.out["result"] as? String == SendOutcome.ack(.rateLimited).message)
         #expect(asked.count == 1)
@@ -64,24 +65,153 @@ struct NudgeServiceTests {
         // A peer it does not know, or an effect Cubi does not have: refused before the network.
         #expect(await sender.send(peerID: "nobody", effect: "zap").ok == false)
         #expect(await sender.send(peerID: "LANNudge-B", effect: "cartoonShock").ok == false)
+    }
 
-        // In time (fresh senders, so the per-sender limit stays out of it; past the sends above):
-        // once Cubi was asked, drawn or not, others are told to wait for overlaySeconds and Cubi is
-        // not asked (F-P2-4); then it is asked again.
+    /// A service off the network whose timers run by hand, Cubi's answer set at will (`answer`),
+    /// and what it was asked: effect, from, message, seconds.
+    @MainActor
+    private final class Rig {
+        var answer = CubiChannel.Presented.shown
+        var asked: [(effect: String, from: String, message: String?, seconds: TimeInterval)] = []
+        var timers: [(seconds: TimeInterval, work: @MainActor () -> Void)] = []
+        var service: NudgeService!
         let t0 = Date().addingTimeInterval(10)
-        let o = NudgeService.overlaySeconds
-        func ask(_ n: Int, _ after: TimeInterval) -> AckStatus? {
-            receiver.receive(from: a.fingerprint + String(n), .valid(id: UUID(), effect: .knock), now: t0.addingTimeInterval(after))
+
+        init(identity: LocalIdentity) {
+            service = NudgeService(network: PeerNetwork(identity: identity, displayName: "B", advertise: false),
+                                   present: { [unowned self] in asked.append(($0, $1, $2, $3)); return answer }, peersChanged: {},
+                                   after: { [unowned self] in timers.append(($0, $1)) })
         }
-        shown = false
-        #expect(ask(1, 0) == .unavailable)
-        #expect(ask(2, o - 0.5) == .rateLimited)
-        #expect(asked.count == 2)
-        shown = true
-        #expect(ask(3, o) == .displayed)
-        #expect(ask(4, o + o - 0.5) == .rateLimited)
-        #expect(ask(5, o + o) == .displayed)
-        #expect(asked.count == 4)
+
+        /// Senders are fingerprint-like strings, ids fresh UUIDs; acceptsQueued and the message are
+        /// what a 0.4.0 sender (true, its text) and an older one (false, none) send.
+        func ask(_ who: String, _ at: TimeInterval, queues: Bool = true, message: String? = nil) -> AckStatus? {
+            service.receive(from: who, .valid(id: UUID(), effect: .knock, message: message, acceptsQueued: queues), now: t0.addingTimeInterval(at))
+        }
+
+        /// Runs the earliest timer and says how long it was set for; none set is a failure, not a crash.
+        func fire() -> TimeInterval {
+            guard !timers.isEmpty else {
+                Issue.record("no timer to run")
+                return -1
+            }
+            let timer = timers.removeFirst()
+            timer.work()
+            return timer.seconds
+        }
+    }
+
+    // The app's v0.4.0 rules, in time.
+    @Test func queueMuteAndRefusalFollowTheApp() throws {
+        defer { Self.labels.forEach(Self.deleteIdentity) }
+        Self.labels.forEach(Self.deleteIdentity)
+        let rig = Rig(identity: try LocalIdentity.loadOrCreate(label: Self.labels[1]))
+        defer { withExtendedLifetime(rig) {} }
+
+        // One on screen: 0.4.0 senders wait in line, one each; an older sender is turned away.
+        #expect(rig.ask("s1", 0) == .displayed)
+        #expect(rig.ask("s2", 0.5) == .queued)
+        #expect(rig.ask("s3", 0.6, queues: false) == .rateLimited)
+        #expect(rig.ask("s2", 0.7) == .rateLimited)
+        #expect(rig.ask("s4", 0.8, message: "abc") == .queued)
+        #expect(rig.service.waiting == 2 && rig.asked.count == 1)
+        // Its time and the app's gap up, the next follows, then the next, message and all.
+        #expect(rig.fire() == NudgeService.overlaySeconds + NudgeService.queueGap)
+        #expect(rig.asked.count == 2 && rig.service.waiting == 1)
+        #expect(rig.fire() == NudgeService.overlaySeconds + NudgeService.queueGap)
+        #expect(rig.asked.count == 3 && rig.asked[2].message == "abc" && rig.service.waiting == 0)
+        // Cubi is told how long, the time the next one waits for (F-P2a-2).
+        #expect(rig.asked[2].seconds == NudgeService.displaySeconds(message: "abc"))
+        #expect(rig.fire() == NudgeService.displaySeconds(message: "abc") + NudgeService.queueGap)
+
+        // Paused: answered muted, nothing asked, the line dropped.
+        #expect(rig.ask("s5", 50) == .displayed)
+        #expect(rig.ask("s6", 50.5) == .queued)
+        rig.service.setMuted(true)
+        #expect(rig.service.waiting == 0)
+        #expect(rig.ask("s7", 51) == .muted)
+        rig.service.setMuted(false)
+        _ = rig.fire()
+
+        // Cubi cannot show (the screen locked): others are turned away for a while, not queued.
+        rig.answer = .unavailable
+        let before = rig.asked.count
+        #expect(rig.ask("s8", 100) == .unavailable)
+        #expect(rig.ask("s9", 100.5) == .rateLimited)
+        #expect(rig.asked.count == before + 1 && rig.service.waiting == 0)
+
+        // One shown, two waiting, then Cubi cannot show the next: the line is dropped.
+        rig.answer = .shown
+        #expect(rig.ask("s10", 200) == .displayed)
+        #expect(rig.ask("s11", 200.5) == .queued)
+        #expect(rig.ask("s12", 200.6) == .queued)
+        rig.answer = .unavailable
+        _ = rig.fire()
+        // s11 could not be shown, and s12 is dropped with it rather than tried later.
+        #expect(rig.service.waiting == 0 && rig.timers.isEmpty)
+    }
+
+    // F-P2a-1 (review of P2a): the reviewer's timeline. s1 at 0, s2 queued at 0.5, s3 at 2.35, just
+    // after the moment the old time-based check (counted from when s1 arrived) ended but before
+    // s1's timer, which starts once Cubi has answered. Now s3 waits behind s2, as in the app.
+    @Test func nothingJumpsTheLineBeforeTheTimerRuns() throws {
+        defer { Self.labels.forEach(Self.deleteIdentity) }
+        Self.labels.forEach(Self.deleteIdentity)
+        let rig = Rig(identity: try LocalIdentity.loadOrCreate(label: Self.labels[1]))
+        defer { withExtendedLifetime(rig) {} }
+        #expect(rig.ask("AAAA", 0) == .displayed)
+        #expect(rig.ask("BBBB", 0.5) == .queued)
+        #expect(rig.ask("CCCC", 2.35) == .queued)
+        _ = rig.fire()
+        _ = rig.fire()
+        #expect(rig.asked.map(\.from) == rig.asked.map(\.from).sorted() && rig.asked.count == 3)
+        #expect(rig.service.waiting == 0)
+    }
+
+    // F-P2a-1: Cubi busy (another plugin's overlay) keeps the line and tries again; new ones wait
+    // behind it; after `busyRetries` busy answers in a row the line is dropped.
+    @Test func cubiBusyKeepsTheLineAndTriesAgain() throws {
+        defer { Self.labels.forEach(Self.deleteIdentity) }
+        Self.labels.forEach(Self.deleteIdentity)
+        let rig = Rig(identity: try LocalIdentity.loadOrCreate(label: Self.labels[1]))
+        defer { withExtendedLifetime(rig) {} }
+
+        // Idle, Cubi busy: that one is answered not shown; those right after it wait.
+        rig.answer = .busy
+        #expect(rig.ask("s1", 0) == .unavailable)
+        #expect(rig.ask("s2", 0.5) == .queued)
+        #expect(rig.ask("s3", 0.6) == .queued)
+        #expect(rig.asked.count == 1 && rig.service.waiting == 2)
+        // Still busy at the retry: s2 asked, kept first in line.
+        #expect(rig.fire() == NudgeService.busyRetry)
+        #expect(rig.asked.count == 2 && rig.asked[1].from.contains("s2") && rig.service.waiting == 2)
+        // Free: s2 again, shown, then s3.
+        rig.answer = .shown
+        #expect(rig.fire() == NudgeService.busyRetry)
+        #expect(rig.asked.count == 3 && rig.asked[2].from.contains("s2") && rig.service.waiting == 1)
+        _ = rig.fire()
+        #expect(rig.asked.count == 4 && rig.asked[3].from.contains("s3") && rig.service.waiting == 0)
+        _ = rig.fire()
+
+        // Busy every time: tried busyRetries times, then the line goes.
+        #expect(rig.ask("s4", 100) == .displayed)
+        #expect(rig.ask("s5", 100.5) == .queued)
+        rig.answer = .busy
+        let before = rig.asked.count
+        _ = rig.fire()
+        while !rig.timers.isEmpty { _ = rig.fire() }
+        #expect(rig.asked.count == before + NudgeService.busyRetries)
+        #expect(rig.service.waiting == 0)
+        // Busy is not a refusal: once free, the next is shown at once.
+        rig.answer = .shown
+        #expect(rig.ask("s6", 200) == .displayed)
+    }
+
+    @Test func aMessageStaysLongerAsInTheApp() {
+        #expect(NudgeService.displaySeconds(message: nil) == NudgeService.overlaySeconds)
+        #expect(NudgeService.displaySeconds(message: String(repeating: "a", count: 5)) == 3)
+        #expect(NudgeService.displaySeconds(message: String(repeating: "a", count: 30)) == 6)
+        #expect(NudgeService.displaySeconds(message: String(repeating: "a", count: NudgeMessage.maxLength)) == 8)
     }
 
     // F-P2-1 (review of P2): the reviewer's hints and names, from a peer's own Bonjour record.

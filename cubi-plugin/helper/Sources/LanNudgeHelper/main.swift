@@ -22,8 +22,11 @@ case .notHello:
 /// plugin and the app are two devices to their peers.
 let identityLabel = "Cubi LAN Nudge Identity"
 
+// Cubi's offline panel picture: the name as stored, nothing written, off the network and keychain.
+let dryRun = ProcessInfo.processInfo.environment["CUBI_RENDER"] == "1"
 let channel = CubiChannel()
-let app = HelperApp(channel: channel, store: DefaultsNameStore()) { name in
+let app = HelperApp(channel: channel, store: dryRun ? MemoryNameStore(copying: DefaultsNameStore()) : DefaultsNameStore(),
+                    dryRun: dryRun) { name in
     PeerNetwork(identity: try LocalIdentity.loadOrCreate(label: identityLabel), displayName: name)
 }
 app.start()
