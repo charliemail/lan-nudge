@@ -21,6 +21,8 @@
   .ln-count { font-variant-numeric: tabular-nums; }
   .ln-result { font-size: 11px; overflow-wrap: anywhere; margin: 0; align-self: flex-start; }
   .ln-result:empty { display: none; }
+  /* The style kit's pill does not wrap: a long error must, inside the card. */
+  .ln-result.cubi-pill { display: block; white-space: normal; max-width: 100%; border-radius: 8px; }
   .ln-text { overflow-wrap: anywhere; }
   .ln-problem { display: block; margin: 0; padding: 8px 10px; border-radius: 8px; white-space: normal; overflow-wrap: anywhere; }
   .ln-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -227,7 +229,7 @@ $("name-save").addEventListener("click", async () => {
   if (!name || graphemes(name) > NAME_LIMIT) {
     return say($("name-result"), { ok: false, out: { error: `名稱要有字，最多 ${NAME_LIMIT} 字` } });
   }
-  const r = await call("setName", { name });
+  const r = await call("set-name", { name });
   say($("name-result"), r);
   if (r.ok) {
     renaming = false;
@@ -246,7 +248,7 @@ $("name-cancel").addEventListener("click", () => {
 });
 $("muted").addEventListener("change", async e => {
   muting = true;
-  const r = await call("setMuted", { muted: e.target.checked ? "true" : "false" });
+  const r = await call("set-muted", { muted: e.target.checked ? "true" : "false" });
   muting = false;
   if (!r.ok) {
     e.target.checked = !e.target.checked;

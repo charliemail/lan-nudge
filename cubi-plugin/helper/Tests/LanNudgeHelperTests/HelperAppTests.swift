@@ -4,7 +4,7 @@ import Testing
 
 // The helper before and after the user sets a name. `makeNetwork` only records the name it was
 // asked for and throws: nothing here touches the keychain or the network. Lines are what the
-// channel writes; `setName`, `send` and their args are the calls the plugin's panel will make.
+// channel writes; `set-name`, `send` and their args are the calls the plugin's panel will make.
 
 private final class MemoryNames: NameStore {
     var name: String?
@@ -42,11 +42,11 @@ private final class Lines: @unchecked Sendable {
     #expect(!send.ok && asked.isEmpty)
 
     // A name with nothing visible in it is no name.
-    let blank = await app.handle(CubiChannel.Call(id: 2, action: "setName", args: ["name": "\n\u{202E} "]))
+    let blank = await app.handle(CubiChannel.Call(id: 2, action: "set-name", args: ["name": "\n\u{202E} "]))
     #expect(!blank.ok && names.name == nil && asked.isEmpty)
 
     // A name: kept (made plain), and only now is the network asked for, with it.
-    let set = await app.handle(CubiChannel.Call(id: 3, action: "setName", args: ["name": " alpha\u{2028} "]))
+    let set = await app.handle(CubiChannel.Call(id: 3, action: "set-name", args: ["name": " alpha\u{2028} "]))
     #expect(set.ok && set.out["name"] as? String == "alpha")
     #expect(names.name == "alpha")
     #expect(asked == ["alpha"])
@@ -62,8 +62,8 @@ private final class Lines: @unchecked Sendable {
     #expect(lines.states.count <= 2)
 
     // 暫停接收: kept, and in the state; anything but "true"/"false" refused.
-    #expect(await app.handle(CubiChannel.Call(id: 5, action: "setMuted", args: ["muted": "yes"])).ok == false)
-    let mute = await app.handle(CubiChannel.Call(id: 6, action: "setMuted", args: ["muted": "true"]))
+    #expect(await app.handle(CubiChannel.Call(id: 5, action: "set-muted", args: ["muted": "yes"])).ok == false)
+    let mute = await app.handle(CubiChannel.Call(id: 6, action: "set-muted", args: ["muted": "true"]))
     #expect(mute.ok && names.muted)
     try await Task.sleep(for: HelperApp.stateInterval + .milliseconds(300))
     #expect(lines.states.last?["muted"] as? Bool == true)
@@ -141,8 +141,8 @@ private final class MemoryDefaults: StringDefaults {
     #expect(lines.states.last?["name"] as? String == "alpha")
     #expect((app.problem ?? "").hasPrefix("預覽"))
     // Calls from the panel behave, and change only the copy.
-    #expect(await app.handle(CubiChannel.Call(id: 1, action: "setName", args: ["name": "beta"])).ok)
-    #expect(await app.handle(CubiChannel.Call(id: 2, action: "setMuted", args: ["muted": "true"])).ok)
+    #expect(await app.handle(CubiChannel.Call(id: 1, action: "set-name", args: ["name": "beta"])).ok)
+    #expect(await app.handle(CubiChannel.Call(id: 2, action: "set-muted", args: ["muted": "true"])).ok)
     #expect(names.name == "alpha" && !names.muted && asked.isEmpty)
 }
 
@@ -189,4 +189,30 @@ private final class MemoryDefaults: StringDefaults {
     app.start()
     let r = await app.handle(CubiChannel.Call(id: 1, action: "send", args: ["peer": "LANNudge-0", "effect": "zap"]))
     #expect(!r.ok && (r.out["error"] as? String ?? "").hasPrefix("預覽"))
+}
+
+// Real-machine 1, step 2: the panel called "setName", which Cubi refuses before the helper sees it
+// (its service.call takes a command's name rule). Every call the panel makes must pass that rule
+// and be one the helper knows. The rule is copied from Cubi's PluginManifest.isValidActionName.
+private func cubiAcceptsAction(_ s: String) -> Bool {
+    let alnum = { (c: Unicode.Scalar) in ("a"..."z").contains(c) || ("0"..."9").contains(c) }
+    guard (1...64).contains(s.count), let first = s.unicodeScalars.first, alnum(first) else { return false }
+    return s.unicodeScalars.allSatisfy { alnum($0) || "._-".unicodeScalars.contains($0) }
+}
+
+@MainActor
+@Test func everyCallThePanelMakesPassesCubiAndIsKnown() async throws {
+    let page = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../../lan-nudge/index.html").standardized
+    let html = try String(contentsOf: page, encoding: .utf8)
+    let names = Set(html.matches(of: /call\("([^"]+)"/).map { String($0.output.1) })
+    // What the panel does today: name, pause, send, status, preview.
+    #expect(names.count >= 5)
+    let app = HelperApp(channel: CubiChannel(output: { _ in }), store: MemoryNames()) { _ in throw NoNetwork() }
+    for name in names.sorted() {
+        #expect(cubiAcceptsAction(name), "Cubi refuses \(name)")
+        let r = await app.handle(CubiChannel.Call(id: 1, action: name, args: [:]))
+        #expect((r.out["error"] as? String)?.hasPrefix("不認得的動作") != true, "the helper does not know \(name)")
+    }
+    // The rule itself, against what made step 2 fail.
+    #expect(!cubiAcceptsAction("setName") && cubiAcceptsAction("set-name"))
 }

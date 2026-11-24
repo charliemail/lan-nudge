@@ -1,6 +1,6 @@
 import Foundation
 
-/// Where the user's display name lives: set from the plugin's panel through Cubi (`call setName`),
+/// Where the user's display name lives: set from the plugin's panel through Cubi (`call set-name`),
 /// never taken from the Mac (its name often is the owner's real name).
 protocol NameStore: AnyObject {
     var name: String? { get set }
@@ -143,14 +143,14 @@ final class HelperApp {
 
     func handle(_ call: CubiChannel.Call) async -> (ok: Bool, out: [String: Any]) {
         switch call.action {
-        case "setName":
+        case "set-name":
             let name = CubiChannel.plain(call.args["name"] ?? "", limit: CubiChannel.nameLimit, fallback: "")
             guard !name.isEmpty else { return (false, ["error": "名稱要有字，最多 \(CubiChannel.nameLimit) 字"]) }
             store.name = name
             startNetwork(name)
             stateChanged()
             return (true, ["name": name])
-        case "setMuted":
+        case "set-muted":
             // "true" or "false": a call's args are strings.
             guard let raw = call.args["muted"], ["true", "false"].contains(raw) else { return (false, ["error": "muted 要是 true 或 false"]) }
             store.muted = raw == "true"
