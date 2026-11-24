@@ -207,6 +207,20 @@ struct NudgeServiceTests {
         #expect(rig.ask("s6", 200) == .displayed)
     }
 
+    // F-P4-3 (review of P4): a preview is on screen as a received one is; a 0.4.0 sender meanwhile
+    // is queued behind it, not answered unavailable, and is shown when its time is up.
+    @Test func aPreviewHoldsTheScreenLikeANudge() throws {
+        defer { Self.labels.forEach(Self.deleteIdentity) }
+        Self.labels.forEach(Self.deleteIdentity)
+        let rig = Rig(identity: try LocalIdentity.loadOrCreate(label: Self.labels[1]))
+        defer { withExtendedLifetime(rig) {} }
+        #expect(rig.service.preview(.cartoonShock, from: "me", now: rig.t0) == .shown)
+        #expect(rig.asked.count == 1 && rig.asked[0].effect == "zap" && rig.asked[0].message == nil)
+        #expect(rig.ask("s1", 0.5) == .queued)
+        #expect(rig.fire() == NudgeService.overlaySeconds + NudgeService.queueGap)
+        #expect(rig.asked.count == 2 && rig.service.waiting == 0)
+    }
+
     @Test func aMessageStaysLongerAsInTheApp() {
         #expect(NudgeService.displaySeconds(message: nil) == NudgeService.overlaySeconds)
         #expect(NudgeService.displaySeconds(message: String(repeating: "a", count: 5)) == 3)

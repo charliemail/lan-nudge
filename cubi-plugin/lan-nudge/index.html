@@ -1,12 +1,279 @@
 <!doctype html>
 <html lang="zh-Hant">
-<head><meta charset="utf-8"><title>LAN Nudge</title></head>
+<head>
+<meta charset="utf-8">
+<title>LAN Nudge</title>
+<style>
+  [hidden] { display: none !important; }
+  html, body { overflow-x: hidden; }
+  .ln-main { display: flex; flex-direction: column; gap: 10px; padding: 12px; min-width: 0; }
+  .ln-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .ln-name { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+  .ln-list { max-height: 250px; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 6px; }
+  .ln-row { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent); min-width: 0; }
+  .ln-line { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
+  .ln-peer { flex: 1 1 100%; min-width: 0; overflow-wrap: anywhere; }
+  .ln-msg { display: flex; gap: 6px; align-items: center; min-width: 0; }
+  .ln-msg input { flex: 1; min-width: 0; }
+  #naming .ln-msg { margin-top: 10px; }
+  .ln-compose { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .ln-compose .ln-count { align-self: flex-end; font-size: 11px; }
+  .ln-count { font-variant-numeric: tabular-nums; }
+  .ln-result { font-size: 11px; overflow-wrap: anywhere; margin: 0; align-self: flex-start; }
+  .ln-result:empty { display: none; }
+  .ln-text { overflow-wrap: anywhere; }
+  .ln-problem { display: block; margin: 0; padding: 8px 10px; border-radius: 8px; white-space: normal; overflow-wrap: anywhere; }
+  .ln-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+</style>
+</head>
 <body>
-  <main class="cubi-main">
-    <section class="cubi-card">
-      <h1 class="cubi-card-title">LAN Nudge</h1>
-      <p class="cubi-muted">Cubi 套件版還在開發中：目前只有背景服務的骨架，還不能互戳。</p>
-    </section>
-  </main>
+<main class="ln-main">
+  <section id="off" class="cubi-card" hidden>
+    <h1 class="cubi-card-title">背景服務沒有開</h1>
+    <p class="ln-text">要戳人、收到別人戳你，請到 Cubi 的 設定 › 插件，打開 LAN Nudge 的「背景服務」。</p>
+    <p id="off-why" class="cubi-muted ln-text"></p>
+  </section>
+
+  <section id="naming" class="cubi-card" hidden>
+    <h1 id="name-title" class="cubi-card-title">先取一個名字</h1>
+    <p id="name-first" class="cubi-muted ln-text">附近的人會看到它。存好之前不會連上網路。</p>
+    <div class="ln-msg">
+      <input id="name-input" type="text" autocomplete="off" placeholder="例如：小明的 MacBook">
+      <span id="name-count" class="cubi-muted ln-count"></span>
+      <button id="name-save" class="cubi-btn primary small">儲存</button>
+      <button id="name-cancel" class="cubi-btn small" hidden>取消</button>
+    </div>
+    <p id="name-result" class="ln-result"></p>
+  </section>
+
+  <section id="ready" hidden>
+    <div class="ln-head">
+      <span id="me" class="ln-name"></span>
+      <button id="rename" class="cubi-btn small">改名</button>
+      <span id="pill" class="cubi-pill"></span>
+    </div>
+    <label class="ln-line"><input id="muted" type="checkbox"> <span>暫停接收</span></label>
+    <!-- Room here for 願意接收超～醒目通知 once the protocol carries it. -->
+    <p id="problem" class="cubi-pill danger ln-problem" hidden></p>
+
+    <div class="cubi-card">
+      <h2 class="cubi-section-title">附近的人</h2>
+      <div id="empty" hidden>
+        <p class="ln-text">沒有找到其他 Mac。</p>
+        <p class="cubi-muted ln-text">請確認：在同一個網路；對方有開 LAN Nudge，或裝了 Cubi 的 LAN Nudge 套件。</p>
+      </div>
+      <div id="list" class="ln-list"></div>
+    </div>
+
+    <div class="ln-foot">
+      <span class="cubi-muted">預覽</span>
+      <button class="cubi-btn small" data-preview="zap">⚡ 觸電</button>
+      <button class="cubi-btn small" data-preview="shake">〰 震動</button>
+      <button class="cubi-btn small" data-preview="knock">✊ 敲門</button>
+      <span id="preview-result" class="ln-result"></span>
+    </div>
+  </section>
+</main>
+
+<script>
+const bridge = window.webkit?.messageHandlers?.cubi;
+const NAME_LIMIT = 40, MESSAGE_LIMIT = 60, RESULT_SECONDS = 5;
+/** Cubi's answer when the service is off: the page's own heading says so already. */
+const NOT_RUNNING = "背景服務沒有在跑";
+const EFFECTS = [["zap", "⚡ 觸電"], ["shake", "〰 震動"], ["knock", "✊ 敲門"]];
+const segmenter = new Intl.Segmenter("zh-Hant", { granularity: "grapheme" });
+/** Characters as a person counts them (and as the helper's Swift does), not UTF-16 units. */
+const graphemes = s => [...segmenter.segment(s)].length;
+const $ = id => document.getElementById(id);
+let current = null;
+/** Renaming: states keep coming (peers change), but the page stays on the name until saved or cancelled. */
+let renaming = false;
+/** A 暫停接收 change on its way: states from before it must not flip the box back meanwhile. */
+let muting = false;
+
+function show(view) {
+  for (const id of ["off", "naming", "ready"]) $(id).hidden = id !== view;
+  $("name-title").textContent = renaming ? "改名字" : "先取一個名字";
+  $("name-first").hidden = renaming;
+  $("name-cancel").hidden = !renaming;
+}
+
+/** One action of the plugin's service: {ok, out, err}; never throws. */
+async function call(action, args) {
+  try {
+    return await bridge.postMessage({ action: "service.call", args: args ? [action, JSON.stringify(args)] : [action] });
+  } catch (e) {
+    return { ok: false, out: null, err: String(e) };
+  }
+}
+
+/** What to say about an answer: Cubi's own error, the service's result or error, as text only. */
+function say(el, r) {
+  const text = r.err || r.out?.result || r.out?.error || (r.ok ? "完成" : "沒有成功");
+  el.textContent = text;
+  el.className = "ln-result cubi-pill " + (r.err ? "danger" : r.ok ? "good" : "warning");
+  clearTimeout(el.fade);
+  el.fade = setTimeout(() => { el.textContent = ""; el.className = "ln-result"; }, RESULT_SECONDS * 1000);
+}
+
+function stopped(why) {
+  current = null;
+  $("off-why").textContent = why && why !== NOT_RUNNING ? why : "";
+  show("off");
+}
+
+/** The service's state: draw what it says, keeping scroll positions and what is being typed. */
+function render(state) {
+  if (!state) return stopped("");
+  current = state;
+  if (state.needsName) {
+    renaming = false;
+    return show("naming");
+  }
+  const listEl = $("list"), y = window.scrollY, top = listEl.scrollTop;
+  if (!renaming) show("ready");
+  $("me").textContent = state.name ?? "";
+  if (!muting) $("muted").checked = !!state.muted;
+  const [label, tone] = state.problem ? ["網路問題", "danger"] : state.muted ? ["已暫停", "warning"] : ["接收中", "good"];
+  $("pill").textContent = label;
+  $("pill").className = "cubi-pill " + tone;
+  $("problem").hidden = !state.problem;
+  $("problem").textContent = state.problem ?? "";
+
+  const peers = Array.isArray(state.peers) ? state.peers : [];
+  $("empty").hidden = peers.length > 0;
+  const rows = new Map([...listEl.children].map(el => [el.dataset.id, el]));
+  for (const peer of peers) {
+    const row = rows.get(peer.id) ?? makeRow(peer.id);
+    rows.delete(peer.id);
+    row.querySelector(".ln-peer").textContent = peer.name;
+    listEl.appendChild(row);
+  }
+  for (const gone of rows.values()) gone.remove();
+  listEl.scrollTop = top;
+  window.scrollTo(0, y);
+}
+
+function element(tag, className, text) {
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  if (text !== undefined) el.textContent = text;
+  return el;
+}
+
+function makeRow(id) {
+  const row = element("div", "ln-row");
+  row.dataset.id = id;
+  const line = element("div", "ln-line");
+  line.appendChild(element("span", "ln-peer"));
+  // Room in this line for the sender's 超～醒目 option once the protocol carries it.
+  const compose = element("div", "ln-compose");
+  compose.hidden = true;
+  const msg = element("div", "ln-msg");
+  const input = element("input");
+  input.type = "text";
+  input.placeholder = "附上一句話，Enter 送出";
+  const pick = element("select");
+  for (const [effect, label] of EFFECTS) pick.appendChild(new Option(label, effect));
+  const count = element("span", "cubi-muted ln-count");
+  const result = element("p", "ln-result");
+  const buttons = EFFECTS.map(([effect, label]) => {
+    const b = element("button", "cubi-btn small", label);
+    b.addEventListener("click", () => send(id, effect, input, all(), result));
+    line.appendChild(b);
+    return b;
+  });
+  const all = () => [...buttons, go];
+  const more = element("button", "cubi-btn small", "附訊息…");
+  more.addEventListener("click", () => { compose.hidden = !compose.hidden; if (!compose.hidden) input.focus(); });
+  line.appendChild(more);
+  const counted = () => {
+    const left = MESSAGE_LIMIT - graphemes(input.value);
+    count.textContent = String(left);
+    count.className = "ln-count " + (left < 0 ? "cubi-pill danger" : "cubi-muted");
+  };
+  input.addEventListener("input", counted);
+  const go = element("button", "cubi-btn primary small", "送出");
+  go.addEventListener("click", () => send(id, pick.value, input, all(), result));
+  input.addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) send(id, pick.value, input, all(), result); });
+  counted();
+  msg.append(pick, input, go);
+  compose.append(msg, count);
+  row.append(line, compose, result);
+  return row;
+}
+
+async function send(peer, effect, input, buttons, result) {
+  if (buttons.some(b => b.disabled)) return;
+  const message = input.value.trim();
+  if (graphemes(message) > MESSAGE_LIMIT) return say(result, { ok: false, out: { error: `訊息最多 ${MESSAGE_LIMIT} 字` } });
+  buttons.forEach(b => { b.disabled = true; });
+  result.textContent = "送出中…";
+  result.className = "ln-result cubi-muted";
+  const r = await call("send", message ? { peer, effect, message } : { peer, effect });
+  buttons.forEach(b => { b.disabled = false; });
+  say(result, r);
+  if (r.ok) {
+    input.value = "";
+    input.dispatchEvent(new Event("input"));
+  }
+}
+
+$("name-input").addEventListener("input", () => {
+  $("name-count").textContent = String(NAME_LIMIT - graphemes($("name-input").value));
+});
+$("name-save").addEventListener("click", async () => {
+  const name = $("name-input").value.trim();
+  if (!name || graphemes(name) > NAME_LIMIT) {
+    return say($("name-result"), { ok: false, out: { error: `名稱要有字，最多 ${NAME_LIMIT} 字` } });
+  }
+  const r = await call("setName", { name });
+  say($("name-result"), r);
+  if (r.ok) {
+    renaming = false;
+    render({ ...(current ?? {}), needsName: false, name: r.out?.name ?? name });
+  }
+});
+$("rename").addEventListener("click", () => {
+  renaming = true;
+  $("name-input").value = current?.name ?? "";
+  $("name-input").dispatchEvent(new Event("input"));
+  show("naming");
+});
+$("name-cancel").addEventListener("click", () => {
+  renaming = false;
+  render(current);
+});
+$("muted").addEventListener("change", async e => {
+  muting = true;
+  const r = await call("setMuted", { muted: e.target.checked ? "true" : "false" });
+  muting = false;
+  if (!r.ok) {
+    e.target.checked = !e.target.checked;
+    say($("preview-result"), r);
+  }
+});
+for (const b of document.querySelectorAll("[data-preview]")) {
+  b.addEventListener("click", async () => {
+    if (b.disabled) return;
+    b.disabled = true;
+    say($("preview-result"), await call("preview", { effect: b.dataset.preview }));
+    b.disabled = false;
+  });
+}
+
+window.addEventListener("cubiservicestate", e => render(e.detail));
+
+/** At open: the last state Cubi kept, or ask the service (none sent yet), or say it is not running. */
+async function start() {
+  if (!bridge) return stopped("這個頁面要在 Cubi 裡打開。");
+  const kept = await bridge.postMessage({ action: "service.state", args: [] }).catch(e => ({ ok: false, err: String(e) }));
+  if (kept.ok && kept.state) return render(kept.state);
+  const asked = await call("status");
+  if (asked.ok && asked.out) return render(asked.out);
+  stopped(asked.err || kept.err || "");
+}
+start();
+</script>
 </body>
 </html>

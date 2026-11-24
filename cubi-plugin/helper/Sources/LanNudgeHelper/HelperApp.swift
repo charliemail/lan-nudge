@@ -157,7 +157,24 @@ final class HelperApp {
             service?.setMuted(store.muted)
             stateChanged()
             return (true, ["muted": store.muted])
+        case "status":
+            // What the last `state` said, asked for: Cubi has none until the first is sent.
+            return (true, Self.stateData(name: store.name, peers: service?.peers ?? [], problem: problem, muted: store.muted))
+        case "preview":
+            // The app's 預覽動畫: on this Mac only, nothing over the network.
+            guard let name = call.args["effect"], let effect = NudgeService.effect(cubi: name) else {
+                return (false, ["error": "effect 只能是 knock、zap、shake"])
+            }
+            // With the network up, through the service: nudges arriving meanwhile queue behind it.
+            let answer = service?.preview(effect, from: store.name ?? "預覽")
+                ?? channel.present(effect: name, from: store.name ?? "預覽", seconds: NudgeService.overlaySeconds, windowShaken: false)
+            switch answer {
+            case .shown: return (true, ["result": "預覽中"])
+            case .busy: return (false, ["error": "上一則還在畫面上"])
+            case .unavailable: return (false, ["error": "現在無法顯示"])
+            }
         case "send":
+            guard !dryRun else { return (false, ["error": "預覽：不送出"]) }
             guard let service else { return (false, ["error": "請先設定名稱"]) }
             return await service.send(peerID: call.args["peer"] ?? "", effect: call.args["effect"] ?? "", message: call.args["message"])
         default:

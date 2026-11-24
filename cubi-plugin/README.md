@@ -2,7 +2,7 @@
 
 給有裝 [Cubi](https://github.com/jc33654/cubi) 的人用的 LAN Nudge：互戳、浮層與音效改由 Cubi 呈現，區網收送沿用這個 repo 的原版程式。沒有 Cubi 的人繼續用 LAN Nudge App，兩者用同一個協定（`_lannudge._tcp`，`Wire.version` 1）互通。
 
-**狀態：實驗中。** 需要支援套件 `service` 欄位的 Cubi，那一版還沒發佈。目前收得到別人戳你（Cubi 畫浮層）；從 Cubi 面板戳別人，要等 Cubi 的面板接上輔助程式。
+**狀態：實驗中。** 需要支援套件 `service` 欄位的 Cubi，那一版還沒發佈。收得到別人戳你（Cubi 畫浮層），也能從套件面板設定名稱、暫停接收、戳附近的人（可附一句話）。
 
 ## 結構
 
@@ -35,7 +35,10 @@ zsh cubi-plugin/scripts/check.sh
 - 暫停接收：`call` 動作 `setMuted`，參數 `muted` 是 `"true"` 或 `"false"`，存在輔助程式自己的偏好設定；開著時每個請求都回「對方暫停接收」，佇列清空。
 - 預覽（Cubi 的 `--render-panel --with-service`，環境有 `CUBI_RENDER=1`）：讀已存的名稱與暫停接收，但不寫回、不上網路、不碰鑰匙圈；`state` 的 `problem` 說明是預覽。
 - 狀態：以 `state` 交給 Cubi，最多每秒一次、最後一次變化一定送出：`{"needsName","name","muted","problem","peers":[{"id","name"}]}`。`peers` 最多 50 台，id 超過 64 bytes 的不列；名稱拿掉控制字元、最多 40 字，同名時加上指紋的前 4 個十六進位字；整行超過 Cubi 的 16384 bytes 時從尾端少列幾台。
-- 送：Cubi 的 `call`，動作 `send`，參數 `peer`（清單裡的 id）、`effect`（`knock`、`zap`、`shake`）與選填的 `message`（照 App 清理、最多 60 字），回覆 `out.result` 是 App 的結果文字；「已觸發」與「已排隊」的 `ok` 是 true。還沒設定名稱時回錯誤。
+- 送：Cubi 的 `call`，動作 `send`，參數 `peer`（清單裡的 id）、`effect`（`knock`、`zap`、`shake`）與選填的 `message`（照 App 清理、最多 60 字），回覆 `out.result` 是 App 的結果文字；「已觸發」與「已排隊」的 `ok` 是 true。還沒設定名稱時回錯誤。預覽（Cubi 的 `--render-panel --with-service`）時回「預覽：不送出」。
+- 狀態：`call` 動作 `status`，回覆 `out` 就是目前的 `state` 內容。面板打開時 Cubi 可能還沒收到第一個 `state`，就用它問。
+- 預覽：`call` 動作 `preview`，參數 `effect`，只請 Cubi 在這台 Mac 上畫一次（名字是自己的），不送網路；Cubi 回忙碌或無法顯示時，回覆 `ok` 是 false，`out.error` 說明原因，不排隊。
+- 面板（`lan-nudge/index.html`）：沒有名稱時只顯示「先取一個名字」；背景服務沒開時說明去哪裡打開；附近沒人時列出檢查事項；平常是名稱、暫停接收、狀態，附近每個人一列，三個效果按鈕加「附訊息…」，結果顯示在那一列下方約 5 秒；底部三個預覽按鈕。名稱與訊息的字數照「看到的字」算（40／60）。對方名稱、訊息與錯誤一律當純文字放進頁面。
 - 對方的名稱來自對方的 Bonjour 公告，可以被冒用，跟 App 一樣；送給 Cubi 前會拿掉控制字元、換行與文字方向字元，並限制長度。
 - stdin 關閉（Cubi 結束、套件關掉）時結束。
 - 套件要的執行檔是 `lan-nudge/bin/lan-nudge-helper`。怎麼建置、怎麼放進去，下一步補上；在那之前 `cubi --validate-plugin cubi-plugin/lan-nudge` 會回報找不到執行檔。

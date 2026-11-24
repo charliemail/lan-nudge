@@ -149,6 +149,12 @@ final class NudgeService {
         }
     }
 
+    /// The app's 預覽動畫 from the panel: shown as one received is, so what arrives meanwhile waits
+    /// behind it as it would behind any other.
+    func preview(_ effect: Effect, from name: String, now: Date = .now) -> CubiChannel.Presented {
+        show(Pending(effect: effect, from: name, message: nil), now: now)
+    }
+
     /// Asks Cubi to show it for its display time. Shown: the next follows when that time and the
     /// gap are up. Busy: tried again later. Unavailable: others are turned away for a while.
     private func show(_ item: Pending, now: Date) -> CubiChannel.Presented {

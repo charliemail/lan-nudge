@@ -145,3 +145,48 @@ private final class MemoryDefaults: StringDefaults {
     #expect(await app.handle(CubiChannel.Call(id: 2, action: "setMuted", args: ["muted": "true"])).ok)
     #expect(names.name == "alpha" && !names.muted && asked.isEmpty)
 }
+
+// P4: the panel's `status` (the state, asked for) and `preview` (the app's 預覽動畫, on this Mac
+// only). Cubi's answers to `present` are its `presented` lines: ok, busy, unavailable
+// (ServiceProtocol.presentFailures).
+@MainActor
+@Test func statusIsTheStateAndPreviewAsksCubiOnly() async {
+    let lines = Lines(), names = MemoryNames()
+    names.name = "alpha"
+    var asked: [String] = []
+    let channel = CubiChannel(output: lines.write)
+    let app = HelperApp(channel: channel, store: names) { name in asked.append(name); throw NoNetwork() }
+    app.start()
+
+    let status = await app.handle(CubiChannel.Call(id: 1, action: "status", args: [:]))
+    #expect(status.ok && status.out["name"] as? String == "alpha" && status.out["needsName"] as? Bool == false)
+
+    // Each preview is one `present` from "alpha", answered by Cubi; nothing else is sent.
+    // Answered at once: a preview holds the main actor until Cubi answers, and tests running beside
+    // this one time their own main-actor work.
+    for (answer, ok) in [(#""ok":true"#, true), (#""ok":false,"reason":"busy""#, false), (#""ok":false,"reason":"unavailable""#, false)] {
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.02) {
+            let id = lines.objects.last { $0["type"] as? String == "present" }?["id"] as? Int ?? -1
+            _ = channel.take(Data(#"{"id":\#(id),\#(answer),"type":"presented"}"#.utf8))
+        }
+        let r = await app.handle(CubiChannel.Call(id: 2, action: "preview", args: ["effect": "zap"]))
+        #expect(r.ok == ok)
+        #expect((r.out["result"] ?? r.out["error"]) as? String != nil)
+        let present = lines.objects.last { $0["type"] as? String == "present" }
+        #expect(present?["effect"] as? String == "zap" && present?["from"] as? String == "alpha")
+    }
+    #expect(lines.objects.filter { $0["type"] as? String == "present" }.count == 3)
+    // An effect Cubi has no name for: refused before Cubi is asked.
+    let bad = await app.handle(CubiChannel.Call(id: 3, action: "preview", args: ["effect": "cartoonShock"]))
+    #expect(!bad.ok && lines.objects.filter { $0["type"] as? String == "present" }.count == 3)
+}
+
+@MainActor
+@Test func aDryRunSaysItSendsNothing() async {
+    let names = MemoryNames()
+    names.name = "alpha"
+    let app = HelperApp(channel: CubiChannel(output: { _ in }), store: MemoryNameStore(copying: names), dryRun: true) { _ in throw NoNetwork() }
+    app.start()
+    let r = await app.handle(CubiChannel.Call(id: 1, action: "send", args: ["peer": "LANNudge-0", "effect": "zap"]))
+    #expect(!r.ok && (r.out["error"] as? String ?? "").hasPrefix("預覽"))
+}
