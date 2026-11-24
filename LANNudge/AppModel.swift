@@ -15,6 +15,7 @@ final class AppModel {
     private(set) var networkProblem: String?
     private(set) var identityError: String?
     private(set) var lastResult: String?
+    let pet: DesktopPet
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var identity: LocalIdentity?
@@ -26,6 +27,7 @@ final class AppModel {
         defaults = instance.flatMap { UserDefaults(suiteName: "dev.lannudge.instance.\($0)") } ?? .standard
         displayName = defaults.string(forKey: "displayName") ?? ""
         muted = defaults.bool(forKey: "muted")
+        pet = DesktopPet(defaults: defaults, instance: instance)
 
         do {
             identity = try LocalIdentity.loadOrCreate(label: "LAN Nudge Identity" + (instance.map { " \($0)" } ?? ""))
@@ -69,6 +71,14 @@ final class AppModel {
         }
     }
 
+    /// While the desktop pet is visible it is the only reaction to every effect (no overlay, no window
+    /// shake). Hidden pet (full-screen Space, turned off) falls back to the effect's own overlay.
+    @discardableResult
+    func present(_ effect: Effect, from sender: String) -> Bool {
+        if pet.shock(from: sender) { return true }
+        return !pet.isShocking && OverlayController.shared.show(effect, from: sender)
+    }
+
     private func receive(from sender: String, _ check: RequestCheck) -> AckStatus? {
         switch check {
         case .unreadable:
@@ -79,9 +89,9 @@ final class AppModel {
             // ponytail: the name comes from the sender's own Bonjour record, so it can be spoofed;
             // accepted with the no-pairing decision.
             let name = peers.first { sender.hasPrefix($0.hint) }.map(label) ?? "未知裝置（\(sender.prefix(4))）"
-            let overlay = OverlayController.shared
-            return gate.decide(sender: sender, id: id, now: .now, muted: muted, busy: overlay.isShowing) {
-                !screensAsleep && !Self.screenLocked() && overlay.show(effect, from: name)
+            let busy = OverlayController.shared.isShowing || pet.isShocking
+            return gate.decide(sender: sender, id: id, now: .now, muted: muted, busy: busy) {
+                !screensAsleep && !Self.screenLocked() && present(effect, from: name)
             }
         }
     }

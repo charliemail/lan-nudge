@@ -44,7 +44,7 @@ private struct MenuContent: View {
         Toggle("暫停接收", isOn: $model.muted)
         Menu("預覽動畫") {
             ForEach(Effect.allCases, id: \.self) { effect in
-                Button(effect.title) { OverlayController.shared.show(effect, from: "預覽") }
+                Button(effect.title) { model.present(effect, from: "預覽") }
             }
         }
         Button("設定…") {

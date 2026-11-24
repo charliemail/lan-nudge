@@ -44,6 +44,27 @@ struct SettingsView: View {
                 }
             }
 
+            Section("桌面寵物") {
+                Toggle("顯示桌面寵物", isOn: Bindable(model.pet).enabled)
+                ForEach(DesktopPet.Pose.allCases, id: \.self) { pose in
+                    LabeledContent(pose.title) {
+                        HStack {
+                            Text(model.pet.customPoses.contains(pose) ? "自訂" : "預設").foregroundStyle(.secondary)
+                            if model.pet.customPoses.contains(pose) {
+                                Button("還原預設") { model.pet.restoreDefault(pose) }
+                            }
+                            Button("選擇 GIF…") { model.pet.choose(pose) }
+                        }
+                    }
+                }
+                Text("開啟時，不論對方送哪種提醒，都只會由角色播放被電擊圖。拖曳角色可以移動位置；全螢幕時角色不會出現，改用一般提醒。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let error = model.pet.error {
+                    Text(error).foregroundStyle(.red)
+                }
+            }
+
             Section {
                 LabeledContent("授權條款") {
                     Button("開啟…") {
