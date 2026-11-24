@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "kind": "tool",
+  "id": "lan-nudge",
+  "name": "LAN Nudge",
+  "panel": { "file": "index.html", "width": 420, "height": 360, "style": "cubi" },
+  "service": {
+    "run": ["$plugin/bin/lan-nudge-helper"],
+    "events": ["notice", "present", "state", "log", "reply"]
+  }
+}

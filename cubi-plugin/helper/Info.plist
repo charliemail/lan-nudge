@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>dev.lannudge.cubi-helper</string>
+	<key>CFBundleName</key>
+	<string>LAN Nudge for Cubi</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>LAN Nudge 需要存取區域網路，才能找到同一網路上的 Mac 並互相傳送提醒。</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_lannudge._tcp</string>
+	</array>
+</dict>
+</plist>

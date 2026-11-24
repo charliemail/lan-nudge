@@ -3,3 +3,6 @@ build/
 xcuserdata/
 # DMGs from scripts/package.sh; publish them as GitHub Release assets, not in git
 release/
+# Cubi plugin helper: build output and its own lockfile (versions are pinned in Package.swift)
+cubi-plugin/helper/.build/
+cubi-plugin/helper/Package.resolved
