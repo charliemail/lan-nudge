@@ -180,6 +180,8 @@ open -n build/DerivedData.noindex/Build/Products/Debug/LANNudge.app --args -inst
 | 2026-11-23 | `zsh scripts/package.sh` | 26 個測試通過 → Release 建置 → `release/LANNudge-0.2.0-2.dmg`（6.3 MB） |
 | 2026-11-24 | `zsh scripts/package.sh`（0.2.1） | 26 個測試通過 → `release/LANNudge-0.2.1-3.dmg`（5.4 MB）；DMG 根目錄與 App Resources 都有 `Licenses.txt`，兩份內容與原始檔一致；整個磁碟區的隱私掃描乾淨；版本為 0.2.1 (3)；簽章驗證通過 |
 | 2026-11-24 | `zsh scripts/package.sh`（0.3.0） | 28 個測試通過 → `release/LANNudge-0.3.0-4.dmg`（6.5 MB）；唯讀掛載確認：版本 0.3.0 (4)，App 內的 `Pet-idle.gif`、`Pet-shock.gif` 與 repo 檔案雜湊一致，`Licenses.txt` 與原始檔一致；`Signature=adhoc`、`codesign --verify --deep --strict` 通過，entitlements 只有 `app-sandbox`；整個磁碟區找不到 `/Users/` 或帳號名稱；SHA-256 `c183dcf1e73e7d3e8887373c2121cc159d032fa934a1605b7fe52e87338daf14` |
+| 2026-11-24 | `zsh scripts/package.sh`（0.4.0） | 38 個測試通過 → `release/LANNudge-0.4.0-5.dmg`（6.5 MB）；唯讀掛載確認：版本 0.4.0 (5)，`Licenses.txt` 與兩張預設圖都和 repo 檔案一致；`Signature=adhoc`、`codesign --verify --deep --strict` 通過，entitlements 只有 `app-sandbox`；整個磁碟區找不到帳號名稱或家目錄路徑；SHA-256 `806fd49907a7d1aace7a8e931fabf0c4e74087e88628fda78c8305e631133aa5` |
+| 2026-11-24 | 單台 Mac 兩個 0.4.0 實例（B、C），人工操作 | 附帶訊息送達並顯示（使用者回報）；接收端關掉桌面寵物時改用提醒小窗顯示效果與訊息，符合設計 |
 | 2026-11-23 | 隱私檢查（修正後重新打包） | 整個 DMG 磁碟區（App、`.DS_Store`、背景圖）都找不到 `/Users/` 或帳號名稱；DMG 5.3 MB，SHA-256 `fc6943c6e09d32841a1d790e68022161b9f65f6dd2ac7ec17f2b424ab03dcaed`；已發佈為 GitHub Release v0.2.0，下載後比對 SHA-256 一致 |
 | 2026-11-23 | 唯讀掛載 DMG 檢查 | 內含「LAN Nudge.app」與 Applications 捷徑；版本 0.2.0 (2)；含 `AppIcon.icns`；`Signature=adhoc`，`codesign --verify --deep --strict` 通過；entitlements 只有 `app-sandbox = false`，沒有 `get-task-allow` |
 | 2026-11-23 | ├ 身分 | 用同一個標籤重新載入，得到同一個指紋 |
