@@ -9,15 +9,26 @@ enum CubiHello {
     /// A first line longer than this is not a hello.
     static let lineLimit = 1024
 
+    enum Greeting: Equatable {
+        case accepted
+        /// A hello for another protocol: this helper cannot talk to that Cubi, and starting it again
+        /// will not change that, so it ends with 0 (Cubi does not restart a service that exits 0).
+        case otherProtocol(Int)
+        case notHello
+    }
+
     private struct Line: Decodable {
         let type: String
         let `protocol`: Int
     }
 
-    static func accepts(_ line: Data) -> Bool {
-        guard line.count <= lineLimit, let hello = try? JSONDecoder().decode(Line.self, from: line) else { return false }
-        return hello.type == "hello" && hello.protocol == protocolVersion
+    static func greeting(_ line: Data) -> Greeting {
+        guard line.count <= lineLimit, let hello = try? JSONDecoder().decode(Line.self, from: line),
+              hello.type == "hello" else { return .notHello }
+        return hello.protocol == protocolVersion ? .accepted : .otherProtocol(hello.protocol)
     }
+
+    static func accepts(_ line: Data) -> Bool { greeting(line) == .accepted }
 
     /// Reads stdin up to the first newline, within `timeout`; nil when nothing complete came.
     static func readFirstLine(from handle: FileHandle = .standardInput, timeout: TimeInterval = timeout) -> Data? {

@@ -29,6 +29,17 @@ private func data(_ s: String) -> Data { Data(s.utf8) }
     #expect(!CubiHello.accepts(data(String(padded))))
 }
 
+@Test func anotherProtocolIsToldApartFromSomethingElse() {
+    // A hello for a protocol this helper does not speak: it ends quietly (exit 0, not restarted).
+    #expect(CubiHello.greeting(data(#"{"protocol":2,"type":"hello"}"#)) == .otherProtocol(2))
+    #expect(CubiHello.greeting(data(cubiHello)) == .accepted)
+    // Anything that is not a hello, or not a whole-number protocol, is not a greeting at all.
+    for line in [#"{"protocol":true,"type":"hello"}"#, #"{"protocol":1.5,"type":"hello"}"#,
+                 #"{"protocol":2,"type":"Hello"}"#, #"{"action":"send","id":3,"type":"call"}"#, ""] {
+        #expect(CubiHello.greeting(data(line)) == .notHello)
+    }
+}
+
 @Test func theFirstLineIsReadUpToItsNewlineOrNotAtAll() throws {
     func first(_ input: String, closing: Bool = true, timeout: TimeInterval = 1) -> Data? {
         let pipe = Pipe()
