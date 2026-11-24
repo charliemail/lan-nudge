@@ -1,11 +1,12 @@
 import AppKit
 
 // Usage: make-dmg-background <out.png> <scale>
-// 640x400 pt DMG window background: arrow from the app icon (160,180) to Applications (480,180) and a hint line.
+// 640x500 pt DMG window background: arrow from the app icon (160,180) to Applications (480,180), a hint
+// line between the rows, and room for Licenses.txt at (320,400).
 // Coordinates must match the --icon / --app-drop-link positions in scripts/package.sh.
 let args = CommandLine.arguments
 let scale = CGFloat(Double(args[2])!)
-let size = NSSize(width: 640, height: 400)
+let size = NSSize(width: 640, height: 500)
 let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale), pixelsHigh: Int(size.height * scale),
                            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
                            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
@@ -37,7 +38,7 @@ let text = "把左邊的 App 拖到右邊的 Applications 資料夾即可安裝"
 let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 15, weight: .medium),
                                             .foregroundColor: NSColor(white: 0.35, alpha: 1)]
 let w = text.size(withAttributes: attrs).width
-text.draw(at: NSPoint(x: (size.width - w) / 2, y: 70), withAttributes: attrs)
+text.draw(at: NSPoint(x: (size.width - w) / 2, y: size.height - 300), withAttributes: attrs)
 
 NSGraphicsContext.current = nil
 try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: args[1]))

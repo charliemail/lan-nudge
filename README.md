@@ -2,7 +2,7 @@
 
 macOS 選單列 App：同一區網內開著 LAN Nudge 的 Mac，可以互相送出「小人觸電」、「視窗震動」或「敲門」提醒，並附帶音效。規格見 `LAN-Nudge-Mac-MVP.md`（原始文件）。
 
-目前版本：**0.2.0 (2)**。第一階段（本機動畫）與第二階段（區網）的程式都已完成，自動測試全部通過；**兩台實體 Mac 的人工驗收尚未執行**。
+目前版本：**0.2.1 (3)**。第一階段（本機動畫）與第二階段（區網）的程式都已完成，自動測試全部通過；**兩台實體 Mac 的人工驗收尚未執行**。
 
 ## 安裝（DMG）
 
@@ -10,6 +10,8 @@ macOS 選單列 App：同一區網內開著 LAN Nudge 的 Mac，可以互相送�
 2. 第一次開啟會被 Gatekeeper 擋下：到「系統設定 → 隱私權與安全性」按「強制打開」。原因是 App 採 ad-hoc 簽章，沒有經過 Apple 公證，詳見「簽章與安裝」。
 3. 輸入顯示名稱，接著依提示允許「區域網路」；系統詢問鑰匙圈時，選「永遠允許」。
 4. 想要「視窗震動」能晃動你正在用的視窗，請在設定視窗開啟「輔助使用」權限。
+
+DMG 裡的 `Licenses.txt` 是授權條款，同一份也放在 App 裡（設定視窗 →「授權條款」→「開啟…」）。
 
 DMG 由 `scripts/package.sh` 產生，放在 `release/`。這個資料夾不進 git，要公開發佈請上傳到 GitHub Releases。
 
@@ -159,6 +161,7 @@ open -n build/DerivedData.noindex/Build/Products/Debug/LANNudge.app --args -inst
 | 2026-11-23 | ├ 真實視窗震動 | 沒有自動測試（需要輔助使用權限和實際視窗） |
 | 2026-11-23 | 真實視窗震動，人工操作（單台 Mac，已開輔助使用權限） | 視窗震動成功（使用者回報） |
 | 2026-11-23 | `zsh scripts/package.sh` | 26 個測試通過 → Release 建置 → `release/LANNudge-0.2.0-2.dmg`（6.3 MB） |
+| 2026-11-24 | `zsh scripts/package.sh`（0.2.1） | 26 個測試通過 → `release/LANNudge-0.2.1-3.dmg`（5.4 MB）；DMG 根目錄與 App Resources 都有 `Licenses.txt`，兩份內容與原始檔一致；整個磁碟區的隱私掃描乾淨；版本為 0.2.1 (3)；簽章驗證通過 |
 | 2026-11-23 | 隱私檢查（修正後重新打包） | 整個 DMG 磁碟區（App、`.DS_Store`、背景圖）都找不到 `/Users/` 或帳號名稱；DMG 5.3 MB，SHA-256 `fc6943c6e09d32841a1d790e68022161b9f65f6dd2ac7ec17f2b424ab03dcaed`；已發佈為 GitHub Release v0.2.0，下載後比對 SHA-256 一致 |
 | 2026-11-23 | 唯讀掛載 DMG 檢查 | 內含「LAN Nudge.app」與 Applications 捷徑；版本 0.2.0 (2)；含 `AppIcon.icns`；`Signature=adhoc`，`codesign --verify --deep --strict` 通過；entitlements 只有 `app-sandbox = false`，沒有 `get-task-allow` |
 | 2026-11-23 | ├ 身分 | 用同一個標籤重新載入，得到同一個指紋 |
@@ -179,7 +182,7 @@ open -n build/DerivedData.noindex/Build/Products/Debug/LANNudge.app --args -inst
 | 震動真實視窗 | 開啟輔助使用權限後，B 打開文字編輯器並在裡面打字，A 送「視窗震動」 | 文字編輯器視窗左右震動約 1 秒後回到原位，游標和輸入不受影響 |
 | 震動退回小窗 | 沒有權限、全螢幕 App、開啟減少動態效果三種情況分別送「視窗震動」 | 只晃動提醒小窗，不會移動任何視窗 |
 | 重建後的權限 | 重新建置 App 後再送「視窗震動」 | 記錄權限是否失效，以及移除再加入後是否恢復 |
-| DMG 安裝 | 在另一台 Mac 打開 DMG，拖到 Applications 後開啟 | 視窗有背景箭頭；Gatekeeper 擋下後按「強制打開」可以執行；Dock 與 Finder 顯示新圖示 |
+| DMG 安裝 | 在另一台 Mac 打開 DMG，拖到 Applications 後開啟 | 視窗有背景箭頭，下方有 `Licenses.txt`；Gatekeeper 擋下後按「強制打開」可以執行；Dock 與 Finder 顯示新圖示 |
 | 首次啟動 | 新使用者第一次開啟 | 設定視窗出現；儲存名稱後跳出區域網路權限詢問 |
 | 區網權限被拒 | 權限詢問時按「不允許」 | 顯示前往系統設定的指引（macOS 27.2 之前無法重置權限，請用新的使用者帳號測） |
 | 探索 | 兩台 Mac 都開啟 | 互相出現在「附近裝置」；關閉其中一台後，從列表消失 |
@@ -203,3 +206,23 @@ open -n build/DerivedData.noindex/Build/Products/Debug/LANNudge.app --args -inst
 - 去重快取超過 256 筆後，最舊的一筆會被淘汰；如果剛好又被重送，可能再播一次。
 - ad-hoc 簽章：更新版本後，可能要重新允許區域網路、鑰匙圈和輔助使用（見「簽章與安裝」與「視窗震動與輔助使用權限」）。
 - 不使用 App Sandbox：App 被入侵時能存取的範圍比沙盒版大。
+
+## 授權
+
+本專案以 [MIT License](LICENSE) 授權。
+
+App 內含以下第三方套件，授權皆為 Apache License 2.0。Apache-2.0 規定，散佈編譯後的程式時必須附上授權條款全文與 NOTICE，所以 [LANNudge/Licenses.txt](LANNudge/Licenses.txt) 收錄了本專案的 MIT 授權、各套件的版本與 NOTICE，以及 Apache License 2.0 全文。這份檔案會放進 App 的 Resources，打包時也會複製一份到 DMG。
+
+| 套件 | 用途 |
+|---|---|
+| [apple/swift-certificates](https://github.com/apple/swift-certificates) | 產生自簽憑證 |
+| [apple/swift-crypto](https://github.com/apple/swift-crypto)（內含 BoringSSL） | swift-certificates 的密碼學依賴 |
+| [apple/swift-asn1](https://github.com/apple/swift-asn1) | swift-certificates 的 ASN.1 編碼依賴 |
+
+更新依賴版本後，請重新產生授權檔（要先建置過一次，讓 SwiftPM 下載套件原始碼）：
+
+```bash
+zsh scripts/licenses.sh
+```
+
+App 圖示（`design/app-icon-source.webp` 與產生的各尺寸檔）、動畫角色與合成音效，跟程式碼一起以 MIT 授權。

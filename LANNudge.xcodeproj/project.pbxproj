@@ -24,6 +24,7 @@
 		B86D86D4B2B4329A4FBFEE93 /* Identity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47562DB5D519568C5D6E8868 /* Identity.swift */; };
 		C4E9B4B3ED7BB5FAFCA6176B /* X509 in Frameworks */ = {isa = PBXBuildFile; productRef = F680C3A5964E97EAC88AF865 /* X509 */; };
 		C554E15257A556D0549AEB73 /* ReceiveGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D092F7D48001727B7B90AC0 /* ReceiveGate.swift */; };
+		C6043311EA8FB59151B5B611 /* Licenses.txt in Resources */ = {isa = PBXBuildFile; fileRef = 206FAA4623B47A400586890B /* Licenses.txt */; };
 		FF4BC9235246C3F7B794CE90 /* PeerNetwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A36599CA4BF33858469B2D6 /* PeerNetwork.swift */; };
 /* End PBXBuildFile section */
 
@@ -42,6 +43,7 @@
 		16A6B6CE832952D5F566B23B /* WindowShaker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowShaker.swift; sourceTree = "<group>"; };
 		1C6995B00213FEF3626DD244 /* MutualTLSTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MutualTLSTests.swift; sourceTree = "<group>"; };
 		1EC478D778C8D1C74AC14CE1 /* LANNudge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LANNudge.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		206FAA4623B47A400586890B /* Licenses.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = Licenses.txt; sourceTree = "<group>"; };
 		21123F621134C12F5722BEFC /* LANNudge.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LANNudge.entitlements; sourceTree = "<group>"; };
 		29A5F3091C7A3354B395B7B8 /* OverlayPlacementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayPlacementTests.swift; sourceTree = "<group>"; };
 		2D092F7D48001727B7B90AC0 /* ReceiveGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiveGate.swift; sourceTree = "<group>"; };
@@ -112,6 +114,7 @@
 				94D028BA01224165E4BA7515 /* Info.plist */,
 				21123F621134C12F5722BEFC /* LANNudge.entitlements */,
 				E4820B770254988E114E609C /* LANNudgeApp.swift */,
+				206FAA4623B47A400586890B /* Licenses.txt */,
 				5686A9AFA0A1A9619FAE8494 /* NudgeView.swift */,
 				F5622ADB04909C1B953FF113 /* OverlayController.swift */,
 				7A36599CA4BF33858469B2D6 /* PeerNetwork.swift */,
@@ -213,6 +216,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				591BDF2A5A219CAA8674FA58 /* Assets.xcassets in Resources */,
+				C6043311EA8FB59151B5B611 /* Licenses.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -331,7 +335,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -346,7 +350,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.2.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -427,7 +431,7 @@
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -448,7 +452,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 0.2.0;
+				MARKETING_VERSION = 0.2.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

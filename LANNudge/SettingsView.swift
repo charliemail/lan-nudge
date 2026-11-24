@@ -43,6 +43,16 @@ struct SettingsView: View {
                     Text(problem).foregroundStyle(.orange)
                 }
             }
+
+            Section {
+                LabeledContent("授權條款") {
+                    Button("開啟…") {
+                        if let url = Bundle.main.url(forResource: "Licenses", withExtension: "txt") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                }
+            }
         }
         .formStyle(.grouped)
         .frame(width: 420)
