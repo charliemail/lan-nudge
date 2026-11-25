@@ -54,29 +54,46 @@ extension View {
 struct NudgeView: View {
     let effect: Effect
     let card: NudgeCard
-    /// A sticky card freezes on the Reduce Motion frame after this, instead of animating until clicked.
+    /// After this the character leaves and only the card stays (with a message, or until 確認), so a
+    /// big centered nudge doesn't keep covering the screen.
     let animateFor: Double
     let reduceMotion: Bool
+    /// Size of the character over its drawn size (150 × 120); the card keeps its size.
+    var scale: CGFloat = 1
     @State private var start = Date()
     @State private var settled = false
+
+    nonisolated static let characterSize = CGSize(width: 150, height: 120)
+
+    /// The character fills about 60% of a big panel's height, leaving room for the card under it.
+    nonisolated static func scale(toFit panel: CGSize) -> CGFloat {
+        min(panel.height * 0.6 / characterSize.height, panel.width / characterSize.width)
+    }
 
     var body: some View {
         TimelineView(.animation(paused: reduceMotion || settled)) { context in
             // t == 0 renders the static frame used for Reduce Motion.
             let t = reduceMotion || settled ? 0 : context.date.timeIntervalSince(start)
-            VStack(spacing: 8) {
-                switch effect {
-                case .cartoonShock: ShockGuy(t: t)
-                case .knock: KnockDoor(t: t)
-                case .shake: EmptyView()
+            VStack(spacing: 8 * scale) {
+                if effect != .shake {
+                    Group {
+                        switch effect {
+                        case .cartoonShock: ShockGuy(t: t)
+                        default: KnockDoor(t: t)
+                        }
+                    }
+                    .scaleEffect(scale)
+                    .frame(width: Self.characterSize.width * scale, height: Self.characterSize.height * scale)
+                    .opacity(settled ? 0 : 1)
+                    .animation(.easeOut(duration: 0.3), value: settled)
                 }
                 label.offset(x: effect == .shake ? Self.shakeOffset(t) : 0)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            // The corner card sits at the panel's bottom; a big one is centered on the screen.
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: scale > 1 ? .center : .bottom)
             .padding(.bottom, 8)
         }
         .task {
-            guard card.confirm != nil else { return }
             try? await Task.sleep(for: .seconds(animateFor))
             settled = true
         }
@@ -113,8 +130,9 @@ private struct ShockGuy: View {
     let t: Double
 
     var body: some View {
-        // Sparks toggle at 3 Hz and stay small, well below photosensitive-flash thresholds.
-        let sparksOn = t == 0 || Int(t * 6).isMultiple(of: 2)
+        // Shown big in the middle of the screen, so the sparks pulse at 2 Hz between 45% and full
+        // opacity: under the three-flashes-a-second limit for photosensitive viewers (WCAG 2.3.1).
+        let sparksOn = t == 0 || Int(t * 4).isMultiple(of: 2)
         let jitter = CGFloat(sin(t * 2 * .pi * 12) * 3)
 
         ZStack {
@@ -155,7 +173,7 @@ private struct ShockGuy: View {
                     .shadow(color: .orange, radius: 3)
                     .rotationEffect(.degrees(angle))
                     .offset(x: x, y: y)
-                    .opacity(sparksOn ? 1 : 0.15)
+                    .opacity(sparksOn ? 1 : 0.45)
             }
         }
         .frame(width: 130, height: 120)

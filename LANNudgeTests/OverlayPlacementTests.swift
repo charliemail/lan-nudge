@@ -29,6 +29,16 @@ struct OverlayPlacementTests {
         #expect(f.minY == primary.visible.minY + 16)
     }
 
+    @Test func bigNudgeIsCenteredAndFitsTheScreen() {
+        let size = OverlayController.bigSize(in: primary.visible)
+        let f = OverlayController.centered(size: size, in: primary.visible)
+        #expect(primary.visible.contains(f))
+        #expect(abs(f.midX - primary.visible.midX) <= 1 && abs(f.midY - primary.visible.midY) <= 1)
+        #expect(size.height == (primary.visible.height * OverlayController.bigShare).rounded())
+        let scale = NudgeView.scale(toFit: size)
+        #expect(scale > 2 && NudgeView.characterSize.height * scale <= size.height * 0.6 + 0.01)
+    }
+
     @Test func shakeSettlesToRest() {
         #expect(NudgeView.shakeOffset(1.2) == 0)
     }

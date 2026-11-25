@@ -10,6 +10,9 @@ final class OverlayController {
     /// Default without a message. Longer than the spec's ~1 s: at 1.2 s the shock was gone before
     /// people noticed it.
     static let defaultDuration = 2.0
+    /// 小人觸電 and 敲門 take the middle of the screen at this share of its shorter side so they can't
+    /// be missed; 視窗震動 keeps the corner card, since the real window is what moves.
+    nonisolated static let bigShare: CGFloat = 0.7
 
     private var panel: NSPanel?
     private var timer: Task<Void, Never>?
@@ -23,10 +26,13 @@ final class OverlayController {
         guard let visible = Self.visibleFrame(for: NSEvent.mouseLocation, screens: screens) else { return false }
 
         let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        let panel = OverlayPanel(contentRect: Self.frame(size: Self.panelSize, in: visible))
+        let big = effect != .shake
+        let size = big ? Self.bigSize(in: visible) : Self.panelSize
+        let panel = OverlayPanel(contentRect: big ? Self.centered(size: size, in: visible) : Self.frame(size: size, in: visible))
         panel.ignoresMouseEvents = card.confirm == nil
         panel.contentView = FirstClickHostingView(rootView: NudgeView(effect: effect, card: card, animateFor: animateFor,
-                                                                        reduceMotion: reduceMotion))
+                                                                        reduceMotion: reduceMotion,
+                                                                        scale: big ? NudgeView.scale(toFit: size) : 1))
         panel.orderFrontRegardless()
         Sounds.play(effect)
         // The overlay label still names the sender; the real window shake is best-effort on top.
@@ -76,6 +82,16 @@ final class OverlayController {
     /// because `main` means "screen with the key window", which an accessory app rarely owns.
     nonisolated static func visibleFrame(for point: CGPoint, screens: [(frame: CGRect, visible: CGRect)]) -> CGRect? {
         (screens.first { $0.frame.contains(point) } ?? screens.first)?.visible
+    }
+
+    nonisolated static func bigSize(in visible: CGRect) -> CGSize {
+        let side = (min(visible.width, visible.height) * bigShare).rounded()
+        return CGSize(width: side, height: side)
+    }
+
+    nonisolated static func centered(size: CGSize, in visible: CGRect) -> CGRect {
+        CGRect(x: (visible.midX - size.width / 2).rounded(), y: (visible.midY - size.height / 2).rounded(),
+               width: size.width, height: size.height)
     }
 
     nonisolated static func frame(size: CGSize, in visible: CGRect, margin: CGFloat = 16) -> CGRect {
