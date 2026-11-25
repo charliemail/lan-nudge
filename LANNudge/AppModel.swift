@@ -148,6 +148,11 @@ final class AppModel {
 
     func clearHistory() { history.removeAll() }
 
+    /// The desktop pet's read-receipt GIF, or a notice at the top right when the pet can't show it.
+    func showRead(from name: String) {
+        if !pet.read("\(name) 已讀") { OverlayController.shared.toast("\(name) 已讀") }
+    }
+
     var needsSetup: Bool { displayName.isEmpty }
 
     func setDisplayName(_ name: String) {
@@ -258,7 +263,7 @@ final class AppModel {
         case .read(let id):
             guard !blocked.keys.contains(where: { sender.hasPrefix($0) }), let name = sent.claim(id, from: sender) else { return .invalid }
             lastResult = "\(name)：已讀"
-            if !muted, !pet.read("\(name) 已讀") { OverlayController.shared.toast("\(name) 已讀") }
+            if !muted { showRead(from: name) }
             return .displayed
         case .valid(let id, let effect, let message, let acceptsQueued):
             // ponytail: the name comes from the sender's own Bonjour record, so it can be spoofed;

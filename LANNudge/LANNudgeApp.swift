@@ -82,6 +82,10 @@ private struct MenuContent: View {
             ForEach(Effect.allCases, id: \.self) { effect in
                 Button(effect.title) { model.present(effect, from: "預覽") }
             }
+            Divider()
+            // Follows the receiving settings, so with 點確認才消失 it waits for 確認 like a real one.
+            Button("附帶訊息") { model.present(.cartoonShock, from: "預覽", message: "這是附帶訊息的預覽，對方傳來的文字會顯示在這裡。") }
+            Button("已讀回條") { model.showRead(from: "預覽") }
         }
         Button("設定…") { bringUp("settings") }
         Divider()

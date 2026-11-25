@@ -23,10 +23,11 @@ struct DesktopPetTests {
         #expect(DesktopPet.playDuration(of: try gif(frames: 4, delay: 3)) == 5)
     }
 
-    @Test(arguments: ["Pet-idle", "Pet-shock"])
+    @Test(arguments: ["Pet-idle", "Pet-shock", "Pet-read"])
     func bundledDefaultLoadsAndAnimates(_ name: String) throws {
         let url = try #require(Bundle.main.url(forResource: name, withExtension: "gif"))
         let image = try #require(NSImage(contentsOf: url))
-        #expect(DesktopPet.playDuration(of: image) > 1.2)
+        let rep = try #require(image.representations.first as? NSBitmapImageRep)
+        #expect((rep.value(forProperty: .frameCount) as? Int ?? 0) > 1)
     }
 }

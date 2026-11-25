@@ -25,6 +25,7 @@
 		67A91A31D404FD7D92177F86 /* ProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01082B9C1E1B9B17961BCAAD /* ProtocolTests.swift */; };
 		930B277BAD478F69595F51F1 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9317213E6A7439E68FEAC001 /* SettingsView.swift */; };
 		B0F9011D7272E53A464CDB42 /* SoundsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0CC5AD076D922D096EE1921 /* SoundsTests.swift */; };
+		B4482D38D4F9B7EB57250277 /* Pet-read.gif in Resources */ = {isa = PBXBuildFile; fileRef = B069E1CFF3C8F085FEB1E583 /* Pet-read.gif */; };
 		B86D86D4B2B4329A4FBFEE93 /* Identity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47562DB5D519568C5D6E8868 /* Identity.swift */; };
 		B92253D1F6845B790F64D0E8 /* DesktopPet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E1F77CCA0975AFE234B4865 /* DesktopPet.swift */; };
 		C4E9B4B3ED7BB5FAFCA6176B /* X509 in Frameworks */ = {isa = PBXBuildFile; productRef = F680C3A5964E97EAC88AF865 /* X509 */; };
@@ -61,6 +62,7 @@
 		9317213E6A7439E68FEAC001 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		94D028BA01224165E4BA7515 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		AB1BC42DB5ED0D832A1761AD /* Pet-shock.gif */ = {isa = PBXFileReference; lastKnownFileType = image.gif; path = "Pet-shock.gif"; sourceTree = "<group>"; };
+		B069E1CFF3C8F085FEB1E583 /* Pet-read.gif */ = {isa = PBXFileReference; lastKnownFileType = image.gif; path = "Pet-read.gif"; sourceTree = "<group>"; };
 		B19E3A4355936C5059FC5998 /* DesktopPetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPetTests.swift; sourceTree = "<group>"; };
 		B4610106FE0403654B0C7D0F /* LANNudgeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LANNudgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BAB9C7AD79105949F9879ED1 /* ReceiveGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiveGateTests.swift; sourceTree = "<group>"; };
@@ -132,6 +134,7 @@
 				F5622ADB04909C1B953FF113 /* OverlayController.swift */,
 				7A36599CA4BF33858469B2D6 /* PeerNetwork.swift */,
 				D784E0B772C3A5B6E04C02A0 /* Pet-idle.gif */,
+				B069E1CFF3C8F085FEB1E583 /* Pet-read.gif */,
 				AB1BC42DB5ED0D832A1761AD /* Pet-shock.gif */,
 				F9373CB88DB3512E217EA518 /* Protocol.swift */,
 				2D092F7D48001727B7B90AC0 /* ReceiveGate.swift */,
@@ -233,6 +236,7 @@
 				591BDF2A5A219CAA8674FA58 /* Assets.xcassets in Resources */,
 				C6043311EA8FB59151B5B611 /* Licenses.txt in Resources */,
 				2553DDA9F5AFE0A243E4FD4B /* Pet-idle.gif in Resources */,
+				B4482D38D4F9B7EB57250277 /* Pet-read.gif in Resources */,
 				39AD4F744520C93AE56FA626 /* Pet-shock.gif in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

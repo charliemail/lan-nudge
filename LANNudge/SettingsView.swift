@@ -4,6 +4,8 @@ struct SettingsView: View {
     @Bindable var model: AppModel
     @State private var name = ""
     @State private var axTrusted = WindowShaker.isTrusted
+    private static let peerRowHeight = NSLayoutManager().defaultLineHeight(for: .preferredFont(forTextStyle: .body)).rounded(.up)
+    private static let peerSpacing: CGFloat = 6
 
     var body: some View {
         Form {
@@ -38,7 +40,16 @@ struct SettingsView: View {
                     Text("找不到其他 Mac。請確認兩端都已開啟 LAN Nudge；訪客 Wi-Fi、AP 隔離或防火牆會讓裝置互相看不到。")
                         .foregroundStyle(.secondary)
                 }
-                ForEach(model.peers) { Text(model.label(for: $0)) }
+                if !model.peers.isEmpty {
+                    // Five rows tall at most; a busy office network lists many more Macs.
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: Self.peerSpacing) {
+                            ForEach(model.peers) { Text(model.label(for: $0)).frame(maxWidth: .infinity, alignment: .leading) }
+                        }
+                    }
+                    .scrollIndicators(.visible)
+                    .frame(height: CGFloat(min(model.peers.count, 5)) * (Self.peerRowHeight + Self.peerSpacing) - Self.peerSpacing)
+                }
                 if let problem = model.networkProblem {
                     Text(problem).foregroundStyle(.orange)
                 }
@@ -73,16 +84,15 @@ struct SettingsView: View {
                 ForEach(DesktopPet.Pose.allCases, id: \.self) { pose in
                     LabeledContent(pose.title) {
                         HStack {
-                            Text(model.pet.customPoses.contains(pose) ? "自訂" : pose.hasDefault ? "預設" : "未設定")
-                                .foregroundStyle(.secondary)
+                            Text(model.pet.customPoses.contains(pose) ? "自訂" : "預設").foregroundStyle(.secondary)
                             if model.pet.customPoses.contains(pose) {
-                                Button(pose.hasDefault ? "還原預設" : "移除") { model.pet.restoreDefault(pose) }
+                                Button("還原預設") { model.pet.restoreDefault(pose) }
                             }
                             Button("選擇 GIF…") { model.pet.choose(pose) }
                         }
                     }
                 }
-                Text("開啟時，不論對方送哪種提醒，都只會由角色播放被電擊圖；對方已讀你的提醒時，有設已讀回條圖就由角色播放，沒有就在右上角顯示小提示。拖曳角色可以移動位置；全螢幕時角色不會出現，改用一般提醒。")
+                Text("開啟時，不論對方送哪種提醒，都只會由角色播放被電擊圖；對方已讀你的提醒時，角色播放已讀回條圖。拖曳角色可以移動位置；全螢幕時角色不會出現，改用一般提醒。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if let error = model.pet.error {

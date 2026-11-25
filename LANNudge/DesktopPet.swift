@@ -3,9 +3,9 @@ import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Character that idles on the desktop and plays a "shocked" GIF on any nudge.
-/// Default GIFs ship in the bundle (Pet-idle.gif / Pet-shock.gif); a GIF the user picks is copied
-/// into Application Support and takes precedence.
+/// Character that idles on the desktop, plays a "shocked" GIF on any nudge and a read-receipt GIF
+/// when a nudge the user sent is read. Default GIFs ship in the bundle (Pet-idle/-shock/-read.gif);
+/// a GIF the user picks is copied into Application Support and takes precedence.
 @MainActor @Observable
 final class DesktopPet {
     enum Pose: String, CaseIterable {
@@ -17,8 +17,6 @@ final class DesktopPet {
             case .read: "已讀回條圖"
             }
         }
-        /// No bundled default: without a chosen GIF, read receipts show as a small notice instead.
-        var hasDefault: Bool { self != .read }
     }
 
     static let height: CGFloat = 180
@@ -99,8 +97,8 @@ final class DesktopPet {
         return true
     }
 
-    /// One loop of the read-receipt GIF with `text` under it; false when the pet can't show it (no
-    /// GIF chosen, busy with a nudge, not on this Space) so the caller shows a notice instead.
+    /// The read-receipt GIF with `text` under it; false when the pet can't show it (turned off, busy
+    /// with a nudge, not on this Space) so the caller shows a notice instead.
     func read(_ text: String) -> Bool {
         guard let panel, panel.isOnActiveSpace, !isShocking, let image = images[.read] else { return false }
         isShocking = true
