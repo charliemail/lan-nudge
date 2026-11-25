@@ -227,3 +227,24 @@ private func cubiAcceptsAction(_ s: String) -> Bool {
     let r = await app.handle(CubiChannel.Call(id: 1, action: "request-accessibility", args: [:]))
     #expect(!r.ok && (r.out["error"] as? String ?? "").hasPrefix("預覽"))
 }
+
+// Real-machine 1: the preview can carry a message, cleaned as a sent one is (NudgeMessage.sanitize),
+// and shown for as long as one that arrived with it.
+@MainActor
+@Test func aPreviewCarriesItsMessageCleanedAsASentOne() async {
+    let lines = Lines(), names = MemoryNames()
+    names.name = "alpha"
+    let channel = CubiChannel(output: lines.write)
+    let app = HelperApp(channel: channel, store: names) { _ in throw NoNetwork() }
+    app.start()
+    DispatchQueue.global().asyncAfter(deadline: .now() + 0.02) {
+        let id = lines.objects.last { $0["type"] as? String == "present" }?["id"] as? Int ?? -1
+        _ = channel.take(Data(#"{"id":\#(id),"ok":true,"type":"presented"}"#.utf8))
+    }
+    let r = await app.handle(CubiChannel.Call(id: 1, action: "preview", args: ["effect": "knock", "message": " 三點\n開會 "]))
+    #expect(r.ok)
+    let present = lines.objects.last { $0["type"] as? String == "present" }
+    let cleaned = NudgeMessage.sanitize(" 三點\n開會 ")
+    #expect(present?["message"] as? String == cleaned && cleaned != nil)
+    #expect(present?["seconds"] as? Double == NudgeService.displaySeconds(message: cleaned))
+}

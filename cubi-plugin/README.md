@@ -39,7 +39,7 @@ zsh cubi-plugin/scripts/check.sh
 - 震動晃視窗（App 的 WindowShaker，`helper/Sources/LanNudgeHelper/WindowShaker.swift` 是指向 App 原檔的符號連結）：收到震動、要請 Cubi 畫的時候，先晃前景 App 的焦點視窗 1.1 秒，再把有沒有晃到放進 `present` 的 `windowShaken`，晃到了 Cubi 就不自己晃。沒有「輔助使用」權限、沒有視窗、全螢幕視窗、開了減少動態效果、螢幕鎖定或主螢幕休眠時不晃（鎖定、休眠時 Cubi 也不畫，回 unavailable）。被限流、排隊、暫停接收的請求不會晃；每一則最多只試著晃一次，Cubi 忙碌而重試時改由 Cubi 自己晃。面板的「預覽 › 震動」不晃真實視窗（那時最前面的通常就是面板本身），只晃 Cubi。原版 WindowShaker 用到的 `NudgeView.shakeOffset` 由 `NudgeViewShim.swift` 照 App 的數字提供。
 - 輔助使用權限算在輔助程式自己頭上（Cubi 以 disclaim 啟動它）。`state` 的 `accessibility` 是目前有沒有權限，每 5 秒看一次、變了才送；`call` 動作 `request-accessibility` 跳系統詢問（只在使用者按面板的按鈕時；預覽時不跳）。
 - 狀態：`call` 動作 `status`，回覆 `out` 就是目前的 `state` 內容。面板打開時 Cubi 可能還沒收到第一個 `state`，就用它問。
-- 預覽：`call` 動作 `preview`，參數 `effect`，只請 Cubi 在這台 Mac 上畫一次（名字是自己的），不送網路；Cubi 回忙碌或無法顯示時，回覆 `ok` 是 false，`out.error` 說明原因，不排隊。
+- 預覽：`call` 動作 `preview`，參數 `effect` 與選填的 `message`（照 App 清理，跟送出時一樣），只請 Cubi 在這台 Mac 上畫一次（名字是自己的），不送網路；Cubi 回忙碌或無法顯示時，回覆 `ok` 是 false，`out.error` 說明原因，不排隊。
 - 面板（`lan-nudge/index.html`）：沒有名稱時只顯示「先取一個名字」；背景服務沒開時說明去哪裡打開；附近沒人時列出檢查事項；平常是名稱、暫停接收、狀態，附近每個人一列，三個效果按鈕加「附訊息…」，結果顯示在那一列下方約 5 秒；底部三個預覽按鈕。名稱與訊息的字數照「看到的字」算（40／60）。對方名稱、訊息與錯誤一律當純文字放進頁面。
 - 對方的名稱來自對方的 Bonjour 公告，可以被冒用，跟 App 一樣；送給 Cubi 前會拿掉控制字元、換行與文字方向字元，並限制長度。
 - stdin 關閉（Cubi 結束、套件關掉）時結束。

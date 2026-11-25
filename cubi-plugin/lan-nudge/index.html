@@ -76,7 +76,12 @@
       <button class="cubi-btn small" data-preview="zap">⚡ 觸電</button>
       <button class="cubi-btn small" data-preview="shake">〰 震動</button>
       <button class="cubi-btn small" data-preview="knock">✊ 敲門</button>
+      <button id="preview-more" class="cubi-btn small">附訊息…</button>
       <span id="preview-result" class="ln-result"></span>
+    </div>
+    <div id="preview-compose" class="ln-compose" hidden>
+      <input id="preview-message" type="text" placeholder="預覽時附上一句話">
+      <span id="preview-count" class="cubi-muted ln-count"></span>
     </div>
   </section>
 </main>
@@ -265,14 +270,27 @@ $("ax-open").addEventListener("click", async () => {
   const r = await call("request-accessibility");
   if (!r.ok) say($("preview-result"), r);
 });
+$("preview-more").addEventListener("click", () => {
+  $("preview-compose").hidden = !$("preview-compose").hidden;
+  if (!$("preview-compose").hidden) $("preview-message").focus();
+});
+$("preview-message").addEventListener("input", () => {
+  const left = MESSAGE_LIMIT - graphemes($("preview-message").value);
+  $("preview-count").textContent = String(left);
+  $("preview-count").className = "ln-count " + (left < 0 ? "cubi-pill danger" : "cubi-muted");
+});
 for (const b of document.querySelectorAll("[data-preview]")) {
   b.addEventListener("click", async () => {
     if (b.disabled) return;
+    // With the message box open, the preview carries what is typed in it.
+    const message = $("preview-compose").hidden ? "" : $("preview-message").value.trim();
+    if (graphemes(message) > MESSAGE_LIMIT) return say($("preview-result"), { ok: false, out: { error: `訊息最多 ${MESSAGE_LIMIT} 字` } });
     b.disabled = true;
-    say($("preview-result"), await call("preview", { effect: b.dataset.preview }));
+    say($("preview-result"), await call("preview", message ? { effect: b.dataset.preview, message } : { effect: b.dataset.preview }));
     b.disabled = false;
   });
 }
+$("preview-message").dispatchEvent(new Event("input"));
 
 window.addEventListener("cubiservicestate", e => render(e.detail));
 

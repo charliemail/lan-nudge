@@ -184,9 +184,12 @@ final class HelperApp {
             guard let name = call.args["effect"], let effect = NudgeService.effect(cubi: name) else {
                 return (false, ["error": "effect 只能是 knock、zap、shake"])
             }
+            // An optional message, cleaned as a sent one is, so it looks as it would arrive.
+            let message = NudgeMessage.sanitize(call.args["message"])
             // With the network up, through the service: nudges arriving meanwhile queue behind it.
-            let answer = service?.preview(effect, from: store.name ?? "預覽")
-                ?? channel.present(effect: name, from: store.name ?? "預覽", seconds: NudgeService.overlaySeconds, windowShaken: false)
+            let answer = service?.preview(effect, from: store.name ?? "預覽", message: message)
+                ?? channel.present(effect: name, from: store.name ?? "預覽", message: message,
+                                   seconds: NudgeService.displaySeconds(message: message), windowShaken: false)
             switch answer {
             case .shown: return (true, ["result": "預覽中"])
             case .busy: return (false, ["error": "上一則還在畫面上"])
