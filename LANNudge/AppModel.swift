@@ -40,7 +40,8 @@ final class AppModel {
     nonisolated static let defaultPerSenderLimit = 3
     /// 確認 tells the sender the nudge was read (sticky mode only).
     var sendReadReceipts: Bool { didSet { defaults.set(sendReadReceipts, forKey: "sendReadReceipts") } }
-    /// Recently received nudges, newest first, in memory only: messages aren't written to disk.
+    /// Recently received messages (nudges without one aren't kept), newest first, in memory only:
+    /// messages aren't written to disk.
     private(set) var history: [Received] = []
     var historyLimit: Int {
         didSet {
@@ -95,8 +96,7 @@ final class AppModel {
         let requestID: UUID
         let date: Date
         let sender: String
-        let effect: Effect
-        let message: String?
+        let message: String
         /// Arrived while receiving was paused, so it wasn't shown.
         let paused: Bool
     }
@@ -281,8 +281,8 @@ final class AppModel {
                                      enqueue: { queue.add(Pending(effect: effect, sender: name, message: text, receipt: receipt), from: sender) }) {
                 !away && present(effect, from: name, message: text, receipt: receipt)
             }
-            if !isBlocked, [.displayed, .queued, .muted].contains(status), !history.contains(where: { $0.requestID == id }) {
-                history.insert(Received(requestID: id, date: .now, sender: name, effect: effect, message: text,
+            if let text, !isBlocked, [.displayed, .queued, .muted].contains(status), !history.contains(where: { $0.requestID == id }) {
+                history.insert(Received(requestID: id, date: .now, sender: name, message: text,
                                         paused: status == .muted), at: 0)
                 history = Array(history.prefix(historyLimit))
             }

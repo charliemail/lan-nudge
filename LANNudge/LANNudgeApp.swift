@@ -63,11 +63,11 @@ private struct MenuContent: View {
 
         if let result = model.lastResult { Text(result) }
 
-        Menu("最近收到（\(model.history.count)）") {
-            if model.history.isEmpty { Text("還沒有收到提醒") }
+        Menu("最近收到的訊息（\(model.history.count)）") {
+            if model.history.isEmpty { Text("還沒有收到訊息") }
             ForEach(model.history) { item in
                 Text("\(item.date.formatted(date: .omitted, time: .shortened))　\(item.sender)"
-                     + (item.message.map { "：\($0)" } ?? "：\(item.effect.title)")
+                     + "：\(item.message)"
                      + (item.paused ? "（暫停中）" : ""))
             }
             if !model.history.isEmpty {

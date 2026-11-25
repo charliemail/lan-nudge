@@ -102,12 +102,12 @@ struct SettingsView: View {
 
             Section("紀錄與封鎖") {
                 HStack {
-                    Stepper("最近收到紀錄：\(model.historyLimit) 筆", value: $model.historyLimit, in: AppModel.historyRange)
+                    Stepper("訊息紀錄：\(model.historyLimit) 筆", value: $model.historyLimit, in: AppModel.historyRange)
                     if model.historyLimit != AppModel.defaultHistoryLimit {
                         Button("還原預設") { model.historyLimit = AppModel.defaultHistoryLimit }
                     }
                 }
-                Text("紀錄只存在記憶體，結束 App 就清除；暫停接收期間收到的也會記下來。")
+                Text("只記附帶訊息的提醒，沒附訊息的不記。紀錄只存在記憶體，結束 App 就清除；暫停接收期間收到的也會記下來。")
                     .font(.caption).foregroundStyle(.secondary)
                 if model.blocked.isEmpty {
                     Text("沒有封鎖任何裝置。要封鎖時，從選單列「附近裝置」選對方 →「封鎖」。").foregroundStyle(.secondary)
