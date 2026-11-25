@@ -74,6 +74,25 @@ final class HelperApp {
     func start() {
         if let name = store.name { startNetwork(name) }
         stateChanged()
+        watchAccessibility()
+    }
+
+    /// The Accessibility permission is granted in System Settings, outside the helper: looked at
+    /// every few seconds, and a change goes out in the state (the panel's hint).
+    static let accessibilityCheck: Duration = .seconds(5)
+    private var accessibility = WindowShaker.isTrusted
+
+    private func watchAccessibility() {
+        Task { @MainActor [weak self] in
+            while let self {
+                try? await Task.sleep(for: Self.accessibilityCheck)
+                let now = WindowShaker.isTrusted
+                if now != self.accessibility {
+                    self.accessibility = now
+                    self.stateChanged()
+                }
+            }
+        }
     }
 
     private func startNetwork(_ name: String) {
@@ -85,7 +104,7 @@ final class HelperApp {
         do {
             let network = try makeNetwork(name)
             let service = NudgeService(network: network,
-                                       present: { [channel] in channel.present(effect: $0, from: $1, message: $2, seconds: $3, windowShaken: false) },
+                                       present: { [channel] in channel.present(effect: $0, from: $1, message: $2, seconds: $3, windowShaken: $4) },
                                        peersChanged: { [weak self] in self?.stateChanged() })
             service.setMuted(store.muted)
             self.service = service
@@ -110,9 +129,9 @@ final class HelperApp {
 
     /// What Cubi keeps for the panel: whether a name is needed, the name, what is wrong if anything,
     /// and the peers, kept under Cubi's line limit by leaving peers off the end.
-    static func stateData(name: String?, peers: [Peer], problem: String? = nil, muted: Bool = false) -> [String: Any] {
+    static func stateData(name: String?, peers: [Peer], problem: String? = nil, muted: Bool = false, accessibility: Bool = true) -> [String: Any] {
         var list = NudgeService.list(peers)
-        var data: [String: Any] = ["needsName": name == nil, "muted": muted, "peers": list]
+        var data: [String: Any] = ["needsName": name == nil, "muted": muted, "accessibility": accessibility, "peers": list]
         if let name { data["name"] = name }
         if let problem { data["problem"] = problem }
         while CubiChannel.stateSize(data) > CubiChannel.lineLimit, !list.isEmpty {
@@ -132,7 +151,7 @@ final class HelperApp {
     private func sendState() {
         guard stateDue else { stateScheduled = false; return }
         stateDue = false
-        channel.state(Self.stateData(name: store.name, peers: service?.peers ?? [], problem: problem, muted: store.muted))
+        channel.state(Self.stateData(name: store.name, peers: service?.peers ?? [], problem: problem, muted: store.muted, accessibility: accessibility))
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: Self.stateInterval)
             self?.sendState()
@@ -159,7 +178,7 @@ final class HelperApp {
             return (true, ["muted": store.muted])
         case "status":
             // What the last `state` said, asked for: Cubi has none until the first is sent.
-            return (true, Self.stateData(name: store.name, peers: service?.peers ?? [], problem: problem, muted: store.muted))
+            return (true, Self.stateData(name: store.name, peers: service?.peers ?? [], problem: problem, muted: store.muted, accessibility: accessibility))
         case "preview":
             // The app's 預覽動畫: on this Mac only, nothing over the network.
             guard let name = call.args["effect"], let effect = NudgeService.effect(cubi: name) else {
@@ -173,6 +192,11 @@ final class HelperApp {
             case .busy: return (false, ["error": "上一則還在畫面上"])
             case .unavailable: return (false, ["error": "現在無法顯示"])
             }
+        case "request-accessibility":
+            // The app's 開啟輔助使用權限…: the system's own prompt, for the helper (its responsible process).
+            guard !dryRun else { return (false, ["error": "預覽：不要求權限"]) }
+            WindowShaker.requestPermission()
+            return (true, ["accessibility": WindowShaker.isTrusted])
         case "send":
             guard !dryRun else { return (false, ["error": "預覽：不送出"]) }
             guard let service else { return (false, ["error": "請先設定名稱"]) }

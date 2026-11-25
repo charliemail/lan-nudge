@@ -35,7 +35,8 @@ struct NudgeServiceTests {
         // The receiving side: Cubi's answer is whatever `shown` says.
         var asked: [(effect: String, from: String, message: String?)] = []
         let receiverNetwork = PeerNetwork(identity: b, displayName: "B", advertise: false)
-        let receiver = NudgeService(network: receiverNetwork, present: { asked.append(($0, $1, $2)); _ = $3; return .shown }, peersChanged: {})
+        let receiver = NudgeService(network: receiverNetwork, present: { asked.append(($0, $1, $2)); _ = ($3, $4); return .shown }, peersChanged: {},
+                                    shakeWindow: { false })
         defer { withExtendedLifetime(receiver) {} }
         receiverNetwork.startListener()
         var port: UInt16?
@@ -47,7 +48,7 @@ struct NudgeServiceTests {
 
         // The sending side, with the receiver as its one peer.
         let senderNetwork = PeerNetwork(identity: a, displayName: "A", advertise: false)
-        let sender = NudgeService(network: senderNetwork, present: { _, _, _, _ in .shown }, peersChanged: {})
+        let sender = NudgeService(network: senderNetwork, present: { _, _, _, _, _ in .shown }, peersChanged: {}, shakeWindow: { false })
         sender.setPeers([Peer(id: "LANNudge-B", name: "B", hint: Fingerprint.hint(b.fingerprint), candidates: [endpoint])])
 
         // Over the network, with a message: drawn, triggered; the message reaches Cubi as the app
@@ -72,21 +73,25 @@ struct NudgeServiceTests {
     @MainActor
     private final class Rig {
         var answer = CubiChannel.Presented.shown
-        var asked: [(effect: String, from: String, message: String?, seconds: TimeInterval)] = []
+        var asked: [(effect: String, from: String, message: String?, seconds: TimeInterval, windowShaken: Bool)] = []
+        /// The window shaker's stand-in: what it answers, and how many times it was asked.
+        var canShake = true
+        var shakes = 0
         var timers: [(seconds: TimeInterval, work: @MainActor () -> Void)] = []
         var service: NudgeService!
         let t0 = Date().addingTimeInterval(10)
 
         init(identity: LocalIdentity) {
             service = NudgeService(network: PeerNetwork(identity: identity, displayName: "B", advertise: false),
-                                   present: { [unowned self] in asked.append(($0, $1, $2, $3)); return answer }, peersChanged: {},
+                                   present: { [unowned self] in asked.append(($0, $1, $2, $3, $4)); return answer }, peersChanged: {},
+                                   shakeWindow: { [unowned self] in shakes += 1; return canShake },
                                    after: { [unowned self] in timers.append(($0, $1)) })
         }
 
         /// Senders are fingerprint-like strings, ids fresh UUIDs; acceptsQueued and the message are
         /// what a 0.4.0 sender (true, its text) and an older one (false, none) send.
-        func ask(_ who: String, _ at: TimeInterval, queues: Bool = true, message: String? = nil) -> AckStatus? {
-            service.receive(from: who, .valid(id: UUID(), effect: .knock, message: message, acceptsQueued: queues), now: t0.addingTimeInterval(at))
+        func ask(_ who: String, _ at: TimeInterval, queues: Bool = true, message: String? = nil, effect: Effect = .knock) -> AckStatus? {
+            service.receive(from: who, .valid(id: UUID(), effect: effect, message: message, acceptsQueued: queues), now: t0.addingTimeInterval(at))
         }
 
         /// Runs the earliest timer and says how long it was set for; none set is a failure, not a crash.
@@ -219,6 +224,63 @@ struct NudgeServiceTests {
         #expect(rig.ask("s1", 0.5) == .queued)
         #expect(rig.fire() == NudgeService.overlaySeconds + NudgeService.queueGap)
         #expect(rig.asked.count == 2 && rig.service.waiting == 0)
+    }
+
+    // P3: a shake shakes the real window first (the app's WindowShaker), and Cubi is told whether it
+    // did; the other effects never ask for it.
+    @Test func onlyAShakeShakesTheWindowAndCubiIsToldWhetherItDid() throws {
+        defer { Self.labels.forEach(Self.deleteIdentity) }
+        Self.labels.forEach(Self.deleteIdentity)
+        let rig = Rig(identity: try LocalIdentity.loadOrCreate(label: Self.labels[1]))
+        defer { withExtendedLifetime(rig) {} }
+        // Each is shown, then its time runs out (the timers run by hand) before the next.
+        #expect(rig.ask("s1", 0, effect: .knock) == .displayed)
+        _ = rig.fire()
+        #expect(rig.ask("s2", 10, effect: .cartoonShock) == .displayed)
+        _ = rig.fire()
+        #expect(rig.shakes == 0 && rig.asked.allSatisfy { !$0.windowShaken })
+        #expect(rig.ask("s3", 20, effect: .shake) == .displayed)
+        _ = rig.fire()
+        #expect(rig.shakes == 1 && rig.asked.last?.effect == "shake" && rig.asked.last?.windowShaken == true)
+        // It could not (no permission, no window, full screen): Cubi shakes its own.
+        rig.canShake = false
+        #expect(rig.ask("s4", 30, effect: .shake) == .displayed)
+        #expect(rig.shakes == 2 && rig.asked.last?.windowShaken == false)
+        _ = rig.fire()
+        // Turned away (the same sender again at once) or queued behind one on screen: never shaken.
+        #expect(rig.ask("s4", 30.5, effect: .shake) == .rateLimited)
+        #expect(rig.ask("s5", 40, effect: .knock) == .displayed)
+        #expect(rig.ask("s6", 40.5, effect: .shake) == .queued)
+        #expect(rig.shakes == 2)
+    }
+
+    // F-P3-1 (review of P3): Cubi busy (another plugin's card up) retries a shake; the real window is
+    // tried once, the first time, and the retries ask Cubi to shake its own. A preview never tries it.
+    @Test func aShakeTriesTheWindowOnceHoweverOftenCubiIsBusy() throws {
+        defer { Self.labels.forEach(Self.deleteIdentity) }
+        Self.labels.forEach(Self.deleteIdentity)
+        let rig = Rig(identity: try LocalIdentity.loadOrCreate(label: Self.labels[1]))
+        defer { withExtendedLifetime(rig) {} }
+        #expect(rig.ask("s0", 0, effect: .knock) == .displayed)
+        #expect(rig.ask("s1", 0.5, effect: .shake) == .queued)
+        rig.answer = .busy
+        _ = rig.fire()                       // s0's time up: s1 tried, Cubi busy
+        #expect(rig.shakes == 1 && rig.asked.last?.windowShaken == true)
+        for _ in 0..<3 { _ = rig.fire() }    // three more retries, still busy
+        rig.answer = .shown
+        _ = rig.fire()                       // shown at last
+        #expect(rig.asked.count == 6 && rig.shakes == 1)
+        #expect(rig.asked.suffix(4).allSatisfy { $0.effect == "shake" && !$0.windowShaken })
+        _ = rig.fire()
+        // A direct one Cubi turns away busy: tried that once, not again.
+        rig.answer = .busy
+        #expect(rig.ask("s2", 100, effect: .shake) == .unavailable)
+        #expect(rig.shakes == 2)
+        _ = rig.fire()
+        // The preview: Cubi only.
+        rig.answer = .shown
+        #expect(rig.service.preview(.shake, from: "me", now: rig.t0.addingTimeInterval(200)) == .shown)
+        #expect(rig.shakes == 2 && rig.asked.last?.windowShaken == false)
     }
 
     @Test func aMessageStaysLongerAsInTheApp() {

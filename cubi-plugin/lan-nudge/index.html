@@ -57,6 +57,10 @@
     <label class="ln-line"><input id="muted" type="checkbox"> <span>暫停接收</span></label>
     <!-- Room here for 願意接收超～醒目通知 once the protocol carries it. -->
     <p id="problem" class="cubi-pill danger ln-problem" hidden></p>
+    <div id="ax" class="cubi-pill warning ln-problem" hidden>
+      <span>沒開「輔助使用」，別人震你時只會晃 Cubi，不會晃你的視窗。</span>
+      <button id="ax-open" class="cubi-btn small">開啟輔助使用</button>
+    </div>
 
     <div class="cubi-card">
       <h2 class="cubi-section-title">附近的人</h2>
@@ -139,6 +143,8 @@ function render(state) {
   const [label, tone] = state.problem ? ["網路問題", "danger"] : state.muted ? ["已暫停", "warning"] : ["接收中", "good"];
   $("pill").textContent = label;
   $("pill").className = "cubi-pill " + tone;
+  // Only a helper that says so: an older one sends no accessibility at all.
+  $("ax").hidden = state.accessibility !== false;
   $("problem").hidden = !state.problem;
   $("problem").textContent = state.problem ?? "";
 
@@ -254,6 +260,10 @@ $("muted").addEventListener("change", async e => {
     e.target.checked = !e.target.checked;
     say($("preview-result"), r);
   }
+});
+$("ax-open").addEventListener("click", async () => {
+  const r = await call("request-accessibility");
+  if (!r.ok) say($("preview-result"), r);
 });
 for (const b of document.querySelectorAll("[data-preview]")) {
   b.addEventListener("click", async () => {

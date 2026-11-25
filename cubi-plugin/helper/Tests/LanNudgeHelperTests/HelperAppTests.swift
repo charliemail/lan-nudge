@@ -216,3 +216,14 @@ private func cubiAcceptsAction(_ s: String) -> Bool {
     // The rule itself, against what made step 2 fail.
     #expect(!cubiAcceptsAction("setName") && cubiAcceptsAction("set-name"))
 }
+
+// P3: the state says whether the helper has the Accessibility permission (the panel's hint), and a
+// dry run never asks for it.
+@MainActor
+@Test func theStateCarriesAccessibilityAndADryRunDoesNotAskForIt() async {
+    #expect(HelperApp.stateData(name: "alpha", peers: [], accessibility: false)["accessibility"] as? Bool == false)
+    #expect(HelperApp.stateData(name: "alpha", peers: [])["accessibility"] as? Bool == true)
+    let app = HelperApp(channel: CubiChannel(output: { _ in }), store: MemoryNameStore(copying: MemoryNames()), dryRun: true) { _ in throw NoNetwork() }
+    let r = await app.handle(CubiChannel.Call(id: 1, action: "request-accessibility", args: [:]))
+    #expect(!r.ok && (r.out["error"] as? String ?? "").hasPrefix("預覽"))
+}

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 /// LAN Nudge over the app's own PeerNetwork, with Cubi drawing what the app's overlay drew: a
@@ -23,10 +24,16 @@ final class NudgeService {
         let effect: Effect
         let from: String
         let message: String?
+        /// The real window was tried for this one already (or is not to be): never again, however
+        /// often Cubi is busy; Cubi shakes its own Cubi instead.
+        var windowTried = false
     }
 
     private let network: PeerNetwork
-    private let present: (_ effect: String, _ from: String, _ message: String?, _ seconds: TimeInterval) -> CubiChannel.Presented
+    private let present: (_ effect: String, _ from: String, _ message: String?, _ seconds: TimeInterval, _ windowShaken: Bool) -> CubiChannel.Presented
+    /// The app's WindowShaker on the front window, unless Reduce Motion is on, as the app's overlay
+    /// does; true when it started shaking. Tests put their own in.
+    private let shakeWindow: () -> Bool
     private let peersChanged: () -> Void
     /// Runs the closure after the delay; tests run it at will.
     private let after: (TimeInterval, @escaping @MainActor () -> Void) -> Void
@@ -43,14 +50,24 @@ final class NudgeService {
     private(set) var muted = false
     private(set) var peers: [Peer] = []
 
-    init(network: PeerNetwork, present: @escaping (String, String, String?, TimeInterval) -> CubiChannel.Presented, peersChanged: @escaping () -> Void,
+    init(network: PeerNetwork, present: @escaping (String, String, String?, TimeInterval, Bool) -> CubiChannel.Presented,
+         peersChanged: @escaping () -> Void,
+         shakeWindow: @escaping () -> Bool = { NudgeService.mayShakeWindow() && WindowShaker.shakeFrontWindow() },
          after: @escaping (TimeInterval, @escaping @MainActor () -> Void) -> Void = NudgeService.sleepThen) {
         self.network = network
         self.present = present
+        self.shakeWindow = shakeWindow
         self.peersChanged = peersChanged
         self.after = after
         network.onRequest = { [weak self] in self?.receive(from: $0, $1) }
         network.onPeersChanged = { [weak self] in self?.setPeers($0) }
+    }
+
+    /// Not with Reduce Motion (as the app's overlay), nor while the screen is locked or the main display
+    /// asleep: a window shaking with no Cubi to see is worse than none. Cubi answers those unavailable.
+    static func mayShakeWindow() -> Bool {
+        let locked = (CGSessionCopyCurrentDictionary() as? [String: Any])?["CGSSessionScreenIsLocked"] as? Bool ?? false
+        return !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion && !locked && CGDisplayIsAsleep(CGMainDisplayID()) == 0
     }
 
     nonisolated static func sleepThen(_ seconds: TimeInterval, _ work: @escaping @MainActor () -> Void) {
@@ -152,14 +169,18 @@ final class NudgeService {
     /// The app's 預覽動畫 from the panel: shown as one received is, so what arrives meanwhile waits
     /// behind it as it would behind any other.
     func preview(_ effect: Effect, from name: String, now: Date = .now) -> CubiChannel.Presented {
-        show(Pending(effect: effect, from: name, message: nil), now: now)
+        // Not the real window: the front one is most likely the panel the preview was pressed in.
+        show(Pending(effect: effect, from: name, message: nil, windowTried: true), now: now)
     }
 
     /// Asks Cubi to show it for its display time. Shown: the next follows when that time and the
     /// gap are up. Busy: tried again later. Unavailable: others are turned away for a while.
     private func show(_ item: Pending, now: Date) -> CubiChannel.Presented {
         let seconds = Self.displaySeconds(message: item.message)
-        let answer = present(Self.cubiEffect(item.effect), item.from, item.message, seconds)
+        // The app's WindowShaker checks and starts in one call, so the window goes first; Cubi is
+        // told whether it did, and shakes its own Cubi when not.
+        let shaken = item.effect == .shake && !item.windowTried && shakeWindow()
+        let answer = present(Self.cubiEffect(item.effect), item.from, item.message, seconds, shaken)
         switch answer {
         case .shown:
             showing = true
@@ -191,7 +212,9 @@ final class NudgeService {
             break
         case .busy:
             busyTries += 1
-            if busyTries < Self.busyRetries { retrying = next } else { dropLine() }
+            var again = next
+            again.windowTried = true
+            if busyTries < Self.busyRetries { retrying = again } else { dropLine() }
         case .unavailable:
             dropLine()
         }
