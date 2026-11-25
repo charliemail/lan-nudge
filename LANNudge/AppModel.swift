@@ -24,8 +24,9 @@ final class AppModel {
         }
     }
     nonisolated static let displayRange = 2...15
-    /// Nudges stay on screen until 確認 is clicked instead of timing out; ones that arrive meanwhile,
-    /// or while the screen is locked or asleep, wait in the queue (limits below).
+    /// Nudges with a message stay on screen until 確認 is clicked instead of timing out (ones without
+    /// time out as usual); ones that arrive meanwhile, or while the screen is locked or asleep, wait
+    /// in the queue (limits below).
     var stickyNudges: Bool { didSet { defaults.set(stickyNudges, forKey: "stickyNudges") } }
     var queueLimit: Int {
         didSet { queueLimit = Self.queueLimitRange.clamp(queueLimit); defaults.set(queueLimit, forKey: "queueLimit") }
@@ -37,6 +38,21 @@ final class AppModel {
     nonisolated static let perSenderRange = 1...5
     nonisolated static let defaultQueueLimit = 10
     nonisolated static let defaultPerSenderLimit = 3
+    /// 確認 tells the sender the nudge was read (sticky mode only).
+    var sendReadReceipts: Bool { didSet { defaults.set(sendReadReceipts, forKey: "sendReadReceipts") } }
+    /// Recently received nudges, newest first, in memory only: messages aren't written to disk.
+    private(set) var history: [Received] = []
+    var historyLimit: Int {
+        didSet {
+            historyLimit = Self.historyRange.clamp(historyLimit)
+            defaults.set(historyLimit, forKey: "historyLimit")
+            history = Array(history.prefix(historyLimit))
+        }
+    }
+    nonisolated static let historyRange = 1...50
+    nonisolated static let defaultHistoryLimit = 10
+    /// Fingerprint hint → name when blocked. Blocked senders are answered `muted`, as if paused.
+    private(set) var blocked: [String: String]
     /// Peer the "附帶訊息…" window sends to.
     var composeTarget: Peer?
     private(set) var peers: [Peer] = []
@@ -50,6 +66,9 @@ final class AppModel {
     @ObservationIgnored private var network: PeerNetwork?
     @ObservationIgnored private var gate = ReceiveGate()
     @ObservationIgnored private var screensAsleep = false
+    @ObservationIgnored private var sent = SentLog()
+    /// The sticky nudge on screen, for its read receipt.
+    @ObservationIgnored private var onScreen: Receipt?
     private var queue = NudgeQueue<Pending>()
     /// True from a nudge appearing until its display time (plus a short gap) has passed, or until
     /// 確認 is clicked.
@@ -62,6 +81,24 @@ final class AppModel {
         let effect: Effect
         let sender: String
         let message: String?
+        let receipt: Receipt
+    }
+
+    /// Which request to confirm as read, and to which device (its full TLS fingerprint).
+    struct Receipt {
+        let id: UUID
+        let sender: String
+    }
+
+    struct Received: Identifiable {
+        let id = UUID()
+        let requestID: UUID
+        let date: Date
+        let sender: String
+        let effect: Effect
+        let message: String?
+        /// Arrived while receiving was paused, so it wasn't shown.
+        let paused: Bool
     }
 
     init() {
@@ -73,6 +110,9 @@ final class AppModel {
         stickyNudges = defaults.bool(forKey: "stickyNudges")
         queueLimit = defaults.object(forKey: "queueLimit") as? Int ?? Self.defaultQueueLimit
         perSenderLimit = defaults.object(forKey: "perSenderLimit") as? Int ?? Self.defaultPerSenderLimit
+        sendReadReceipts = defaults.object(forKey: "sendReadReceipts") as? Bool ?? true
+        historyLimit = defaults.object(forKey: "historyLimit") as? Int ?? Self.defaultHistoryLimit
+        blocked = defaults.dictionary(forKey: "blocked") as? [String: String] ?? [:]
         pet = DesktopPet(defaults: defaults, instance: instance)
 
         do {
@@ -99,6 +139,15 @@ final class AppModel {
         startNetworkIfReady()
     }
 
+    func isBlocked(_ peer: Peer) -> Bool { blocked[peer.hint] != nil }
+
+    func setBlocked(_ on: Bool, hint: String, name: String) {
+        blocked[hint] = on ? name : nil
+        defaults.set(blocked, forKey: "blocked")
+    }
+
+    func clearHistory() { history.removeAll() }
+
     var needsSetup: Bool { displayName.isEmpty }
 
     func setDisplayName(_ name: String) {
@@ -118,10 +167,12 @@ final class AppModel {
     func nudge(_ peer: Peer, with effect: Effect, message: String? = nil) {
         guard let network else { return }
         let name = label(for: peer)
+        let id = UUID()
         lastResult = "\(name)：傳送中…"
         Task {
-            let outcome = await network.send(effect, message: NudgeMessage.sanitize(message), to: peer)
+            let outcome = await network.send(effect, message: NudgeMessage.sanitize(message), id: id, to: peer)
             lastResult = "\(name)：\(outcome.message)"
+            if outcome == .ack(.displayed) || outcome == .ack(.queued) { sent.remember(id, hint: peer.hint, name: name) }
         }
     }
 
@@ -129,20 +180,22 @@ final class AppModel {
     /// shake). Hidden pet (full-screen Space, turned off) falls back to the effect's own overlay.
     /// When the display time is up (sticky mode: when 確認 is clicked), the next queued nudge follows.
     @discardableResult
-    func present(_ effect: Effect, from sender: String, message: String? = nil) -> Bool {
+    func present(_ effect: Effect, from sender: String, message: String? = nil, receipt: Receipt? = nil) -> Bool {
         guard !showing else { return false }
         let petLoop = pet.shockLoop
         let time = Self.durations(custom: customDisplaySeconds, message: message,
                                   animation: petLoop ?? OverlayController.defaultDuration)
-        let stayFor: Double? = stickyNudges ? nil : time.total
+        let sticky = stickyNudges && message != nil
+        let stayFor: Double? = sticky ? nil : time.total
         var confirm: (@MainActor () -> Void)?
-        if stickyNudges { confirm = { [weak self] in self?.confirm() } }
+        if sticky { confirm = { [weak self] in self?.confirm() } }
         let card = NudgeCard(sender: sender, message: message, unread: { [weak self] in self?.unread ?? 0 }, confirm: confirm)
         let shown = petLoop != nil
             ? pet.shock(card, animateFor: time.animation, showFor: stayFor)
             : OverlayController.shared.show(effect, card: card, animateFor: time.animation, duration: stayFor)
         guard shown else { return false }
         showing = true
+        onScreen = receipt
         if let stayFor {
             Task {
                 try? await Task.sleep(for: .seconds(stayFor + 0.3))
@@ -159,6 +212,11 @@ final class AppModel {
         pet.dismiss()
         OverlayController.shared.hide()
         showing = false
+        if sendReadReceipts, let receipt = onScreen, let network,
+           let peer = peers.first(where: { receipt.sender.hasPrefix($0.hint) }) {
+            Task { _ = await network.sendReadReceipt(for: receipt.id, to: peer) }
+        }
+        onScreen = nil
         showNext()
     }
 
@@ -166,7 +224,7 @@ final class AppModel {
         guard !muted else { return queue.removeAll() }
         guard !screensAsleep, !Self.screenLocked() else { return dropStaleQueue() }
         while let next = queue.next() {
-            if present(next.effect, from: next.sender, message: next.message) { return }
+            if present(next.effect, from: next.sender, message: next.message, receipt: next.receipt) { return }
         }
     }
 
@@ -197,6 +255,11 @@ final class AppModel {
             return nil
         case .invalid:
             return .invalid
+        case .read(let id):
+            guard !blocked.keys.contains(where: { sender.hasPrefix($0) }), let name = sent.claim(id, from: sender) else { return .invalid }
+            lastResult = "\(name)：已讀"
+            if !muted, !pet.read("\(name) 已讀") { OverlayController.shared.toast("\(name) 已讀") }
+            return .displayed
         case .valid(let id, let effect, let message, let acceptsQueued):
             // ponytail: the name comes from the sender's own Bonjour record, so it can be spoofed;
             // accepted with the no-pairing decision.
@@ -205,12 +268,20 @@ final class AppModel {
             let away = screensAsleep || Self.screenLocked()
             queue.capacity = stickyNudges ? queueLimit : 5
             queue.perSender = stickyNudges ? perSenderLimit : 1
+            let isBlocked = blocked.keys.contains(where: { sender.hasPrefix($0) })
+            let receipt = Receipt(id: id, sender: sender)
             // Sticky mode: while away, nudges wait for the user instead of being turned away.
-            return gate.decide(sender: sender, id: id, now: .now, muted: muted, busy: showing || (stickyNudges && away),
-                               acceptsQueued: acceptsQueued,
-                               enqueue: { queue.add(Pending(effect: effect, sender: name, message: text), from: sender) }) {
-                !away && present(effect, from: name, message: text)
+            let status = gate.decide(sender: sender, id: id, now: .now, muted: muted || isBlocked,
+                                     busy: showing || (stickyNudges && away), acceptsQueued: acceptsQueued,
+                                     enqueue: { queue.add(Pending(effect: effect, sender: name, message: text, receipt: receipt), from: sender) }) {
+                !away && present(effect, from: name, message: text, receipt: receipt)
             }
+            if !isBlocked, [.displayed, .queued, .muted].contains(status), !history.contains(where: { $0.requestID == id }) {
+                history.insert(Received(requestID: id, date: .now, sender: name, effect: effect, message: text,
+                                        paused: status == .muted), at: 0)
+                history = Array(history.prefix(historyLimit))
+            }
+            return status
         }
     }
 

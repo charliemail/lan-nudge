@@ -46,12 +46,13 @@ struct SettingsView: View {
 
             Section("接收") {
                 Toggle("顯示對方附帶的訊息", isOn: $model.showMessages)
-                Picker("提醒消失方式", selection: $model.stickyNudges) {
+                Picker("附帶訊息的提醒", selection: $model.stickyNudges) {
                     Text("時間到自動消失").tag(false)
                     Text("點確認才消失").tag(true)
                 }
                 .pickerStyle(.segmented)
                 if model.stickyNudges {
+                    Toggle("點確認時通知對方已讀", isOn: $model.sendReadReceipts)
                     Stepper("排隊上限：\(model.queueLimit) 則", value: $model.queueLimit, in: AppModel.queueLimitRange)
                     Stepper("同一人最多：\(model.perSenderLimit) 則", value: $model.perSenderLimit, in: AppModel.perSenderRange)
                     if model.queueLimit != AppModel.defaultQueueLimit || model.perSenderLimit != AppModel.defaultPerSenderLimit {
@@ -60,7 +61,7 @@ struct SettingsView: View {
                             model.perSenderLimit = AppModel.defaultPerSenderLimit
                         }
                     }
-                    Text("動畫播完後提醒會留在畫面上，點「確認」才清除，下一則接著出現；有 2 則以上未讀時，右上角顯示數量。螢幕鎖定或睡眠時收到的會先存著，解鎖後顯示。超過上限時，對方會看到「請稍後再試」。對方使用 0.4.0 以前的版本時，這段期間傳來的不會排隊。")
+                    Text("附帶訊息的提醒在動畫播完後會留在畫面上，點「確認」才清除，下一則接著出現；沒附訊息的照常時間到就消失。有 2 則以上未讀時，右上角顯示數量。螢幕鎖定或睡眠時收到的會先存著，解鎖後顯示。超過上限時，對方會看到「請稍後再試」。對方使用 0.4.0 以前的版本時，這段期間傳來的不會排隊。")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
                     displayTime
@@ -72,19 +73,43 @@ struct SettingsView: View {
                 ForEach(DesktopPet.Pose.allCases, id: \.self) { pose in
                     LabeledContent(pose.title) {
                         HStack {
-                            Text(model.pet.customPoses.contains(pose) ? "自訂" : "預設").foregroundStyle(.secondary)
+                            Text(model.pet.customPoses.contains(pose) ? "自訂" : pose.hasDefault ? "預設" : "未設定")
+                                .foregroundStyle(.secondary)
                             if model.pet.customPoses.contains(pose) {
-                                Button("還原預設") { model.pet.restoreDefault(pose) }
+                                Button(pose.hasDefault ? "還原預設" : "移除") { model.pet.restoreDefault(pose) }
                             }
                             Button("選擇 GIF…") { model.pet.choose(pose) }
                         }
                     }
                 }
-                Text("開啟時，不論對方送哪種提醒，都只會由角色播放被電擊圖。拖曳角色可以移動位置；全螢幕時角色不會出現，改用一般提醒。")
+                Text("開啟時，不論對方送哪種提醒，都只會由角色播放被電擊圖；對方已讀你的提醒時，有設已讀回條圖就由角色播放，沒有就在右上角顯示小提示。拖曳角色可以移動位置；全螢幕時角色不會出現，改用一般提醒。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if let error = model.pet.error {
                     Text(error).foregroundStyle(.red)
+                }
+            }
+
+            Section("紀錄與封鎖") {
+                HStack {
+                    Stepper("最近收到紀錄：\(model.historyLimit) 筆", value: $model.historyLimit, in: AppModel.historyRange)
+                    if model.historyLimit != AppModel.defaultHistoryLimit {
+                        Button("還原預設") { model.historyLimit = AppModel.defaultHistoryLimit }
+                    }
+                }
+                Text("紀錄只存在記憶體，結束 App 就清除；暫停接收期間收到的也會記下來。")
+                    .font(.caption).foregroundStyle(.secondary)
+                if model.blocked.isEmpty {
+                    Text("沒有封鎖任何裝置。要封鎖時，從選單列「附近裝置」選對方 →「封鎖」。").foregroundStyle(.secondary)
+                }
+                ForEach(model.blocked.sorted { $0.value < $1.value }, id: \.key) { hint, name in
+                    LabeledContent(name) {
+                        Button("解除封鎖") { model.setBlocked(false, hint: hint, name: name) }
+                    }
+                }
+                if !model.blocked.isEmpty {
+                    Text("被封鎖的裝置傳來的提醒不會顯示，對方會看到「對方暫停接收」。")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
 
@@ -99,8 +124,10 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        // Taller than most screens with every section open: the form scrolls inside a window that
+        // starts at a fixed height and can be dragged taller.
         .frame(width: 420)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(minHeight: 360, idealHeight: 620)
         .onAppear {
             name = model.displayName
             NSApp.activate()

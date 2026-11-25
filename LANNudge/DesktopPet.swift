@@ -9,8 +9,16 @@ import UniformTypeIdentifiers
 @MainActor @Observable
 final class DesktopPet {
     enum Pose: String, CaseIterable {
-        case idle, shock
-        var title: String { self == .idle ? "待機圖" : "被電擊圖" }
+        case idle, shock, read
+        var title: String {
+            switch self {
+            case .idle: "待機圖"
+            case .shock: "被電擊圖"
+            case .read: "已讀回條圖"
+            }
+        }
+        /// No bundled default: without a chosen GIF, read receipts show as a small notice instead.
+        var hasDefault: Bool { self != .read }
     }
 
     static let height: CGFloat = 180
@@ -77,7 +85,7 @@ final class DesktopPet {
         guard shockLoop != nil, let panel, let shock = images[.shock], let idle = images[.idle] else { return false }
         isShocking = true
         panel.setImage(shock)
-        panel.setCaption(card)
+        panel.setCaption(card, title: "\(card.sender) 戳了你一下", symbol: "bolt.fill")
         Sounds.play(.cartoonShock)
         shockTask = Task {
             try? await Task.sleep(for: .seconds(animateFor))
@@ -85,6 +93,22 @@ final class DesktopPet {
             panel.setImage(idle)
             guard let showFor else { return }
             try? await Task.sleep(for: .seconds(max(showFor - animateFor, 0)))
+            guard !Task.isCancelled else { return }
+            dismiss()
+        }
+        return true
+    }
+
+    /// One loop of the read-receipt GIF with `text` under it; false when the pet can't show it (no
+    /// GIF chosen, busy with a nudge, not on this Space) so the caller shows a notice instead.
+    func read(_ text: String) -> Bool {
+        guard let panel, panel.isOnActiveSpace, !isShocking, let image = images[.read] else { return false }
+        isShocking = true
+        panel.setImage(image)
+        panel.setCaption(NudgeCard(sender: "", message: nil, unread: { 0 }, confirm: nil), title: text, symbol: "checkmark.circle.fill")
+        let loop = Self.playDuration(of: image)
+        shockTask = Task {
+            try? await Task.sleep(for: .seconds(max(loop, 2)))
             guard !Task.isCancelled else { return }
             dismiss()
         }
@@ -126,7 +150,7 @@ final class DesktopPet {
                 : Bundle.main.url(forResource: "Pet-\(pose.rawValue)", withExtension: "gif")
             return url.flatMap(NSImage.init(contentsOf:)).map { (pose, $0) }
         })
-        hasImages = images.count == Pose.allCases.count
+        hasImages = images[.idle] != nil && images[.shock] != nil
         guard enabled, hasImages, let idle = images[.idle] else {
             panel?.orderOut(nil)
             panel = nil
@@ -143,7 +167,7 @@ final class DesktopPet {
 /// clicks so it can be dragged; the window server still passes clicks through fully transparent pixels.
 private final class PetPanel: NSPanel {
     private let imageView = DraggableImageView()
-    private let caption = CaptionHostingView(rootView: PetCaption(card: nil))
+    private let caption = CaptionHostingView(rootView: PetCaption(card: nil, title: "", symbol: ""))
 
     init(autosaveName: String) {
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -184,8 +208,8 @@ private final class PetPanel: NSPanel {
         imageView.image = image
     }
 
-    func setCaption(_ card: NudgeCard?) {
-        if let card { caption.rootView = PetCaption(card: card) }
+    func setCaption(_ card: NudgeCard?, title: String = "", symbol: String = "") {
+        if let card { caption.rootView = PetCaption(card: card, title: title, symbol: symbol) }
         caption.isHidden = card == nil
     }
 
@@ -205,12 +229,14 @@ private final class CaptionHostingView: FirstClickHostingView<PetCaption> {
 
 struct PetCaption: View {
     let card: NudgeCard?
+    let title: String
+    let symbol: String
 
     var body: some View {
         if let card {
             HStack(alignment: .top, spacing: 6) {
-                Image(systemName: "bolt.fill").foregroundStyle(.yellow).font(.headline)
-                NudgeCardText(card: card, title: "\(card.sender) 戳了你一下")
+                Image(systemName: symbol).foregroundStyle(symbol == "bolt.fill" ? .yellow : .green).font(.headline)
+                NudgeCardText(card: card, title: title)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)

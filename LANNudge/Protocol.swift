@@ -57,6 +57,14 @@ enum NudgeMessage {
     }
 }
 
+/// Sent back to a nudge's sender when the receiver clicks 確認 on it (sticky mode). Copies before
+/// 0.5.0 answer it `invalid` and show nothing, so it needs no version change either.
+struct ReadReceipt: Codable, Equatable {
+    var version = Wire.version
+    var type = "read"
+    let id: UUID
+}
+
 struct Ack: Codable, Equatable {
     var version = Wire.version
     var type = "ack"
@@ -68,12 +76,14 @@ struct Ack: Codable, Equatable {
 /// readable, so the sender gets an `invalid` ack instead of a silent drop.
 enum RequestCheck: Equatable {
     case valid(id: UUID, effect: Effect, message: String?, acceptsQueued: Bool)
+    /// A `ReadReceipt` for a nudge this copy sent.
+    case read(id: UUID)
     case invalid(id: UUID)
     case unreadable
 
     var id: UUID? {
         switch self {
-        case .valid(let id, _, _, _), .invalid(let id): id
+        case .valid(let id, _, _, _), .read(let id), .invalid(let id): id
         case .unreadable: nil
         }
     }
@@ -89,6 +99,10 @@ enum RequestCheck: Equatable {
         }
         guard let loose = try? JSONDecoder().decode(Loose.self, from: payload), let id = loose.id else {
             self = .unreadable
+            return
+        }
+        if loose.version == Wire.version, loose.type == "read" {
+            self = .read(id: id)
             return
         }
         guard loose.version == Wire.version, loose.type == "nudge",

@@ -220,10 +220,17 @@ final class PeerNetwork {
 
     /// The receiver must present a certificate whose fingerprint starts with the peer's advertised
     /// hint, so a spoofed Bonjour record can't redirect the nudge to another machine.
-    func send(_ effect: Effect, message: String? = nil, to peer: Peer) async -> SendOutcome {
-        let request = NudgeRequest(id: UUID(), effect: effect, message: message)
-        return await withCheckedContinuation { continuation in
-            SendAttempt(request: request, continuation: continuation).start(peer.candidates) { [identity] in
+    func send(_ effect: Effect, message: String? = nil, id: UUID = UUID(), to peer: Peer) async -> SendOutcome {
+        await deliver(NudgeRequest(id: id, effect: effect, message: message), id: id, to: peer)
+    }
+
+    func sendReadReceipt(for id: UUID, to peer: Peer) async -> SendOutcome {
+        await deliver(ReadReceipt(id: id), id: id, to: peer)
+    }
+
+    private func deliver(_ payload: some Encodable, id: UUID, to peer: Peer) async -> SendOutcome {
+        await withCheckedContinuation { continuation in
+            SendAttempt(payload: payload, id: id, continuation: continuation).start(peer.candidates) { [identity] in
                 TLSSetup.parameters(identity: identity) { $0.hasPrefix(peer.hint) }
             }
         }
@@ -235,7 +242,8 @@ final class PeerNetwork {
 /// full-tunnel VPN (LAN address blackholed, VPN address reachable) inside the 5-second budget.
 @MainActor
 private final class SendAttempt {
-    private let request: NudgeRequest
+    private let payload: any Encodable
+    private let id: UUID
     private let continuation: CheckedContinuation<SendOutcome, Never>
     private var connections: [NWConnection] = []
     private var failed: Set<ObjectIdentifier> = []
@@ -243,8 +251,9 @@ private final class SendAttempt {
     private var finished = false
     private var localNetworkDenied = false
 
-    init(request: NudgeRequest, continuation: CheckedContinuation<SendOutcome, Never>) {
-        self.request = request
+    init(payload: any Encodable, id: UUID, continuation: CheckedContinuation<SendOutcome, Never>) {
+        self.payload = payload
+        self.id = id
         self.continuation = continuation
     }
 
@@ -272,10 +281,10 @@ private final class SendAttempt {
             guard winner == nil else { return connection.cancel() }
             winner = connection
             for other in connections where other !== connection { other.cancel() }
-            FrameIO.send(request, on: connection) {}
+            FrameIO.send(payload, on: connection) {}
             FrameIO.readOne(connection) { [self] payload in
                 guard let payload, let ack = try? JSONDecoder().decode(Ack.self, from: payload),
-                      ack.version == Wire.version, ack.id == request.id else { return finish(.noAck) }
+                      ack.version == Wire.version, ack.id == id else { return finish(.noAck) }
                 finish(.ack(ack.status))
             }
         case .waiting:

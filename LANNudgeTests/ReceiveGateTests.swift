@@ -125,6 +125,27 @@ struct ReceiveGateTests {
     }
 }
 
+struct SentLogTests {
+    @Test func receiptCountsOnlyFromTheDeviceItWentToAndOnlyOnce() {
+        var log = SentLog()
+        let id = UUID()
+        log.remember(id, hint: "AAAA1111", name: "C2")
+        #expect(log.claim(id, from: "BBBB2222FFFF") == nil)
+        #expect(log.claim(UUID(), from: "AAAA1111FFFF") == nil)
+        #expect(log.claim(id, from: "AAAA1111FFFF") == "C2")
+        #expect(log.claim(id, from: "AAAA1111FFFF") == nil)
+    }
+
+    @Test func forgetsTheOldestPastCapacity() {
+        var log = SentLog()
+        log.capacity = 2
+        let ids = [UUID(), UUID(), UUID()]
+        ids.forEach { log.remember($0, hint: "A", name: "n") }
+        #expect(log.claim(ids[0], from: "A") == nil)
+        #expect(log.claim(ids[2], from: "A") == "n")
+    }
+}
+
 struct ComposeEditTests {
     @Test func typedReturnSendsWithoutTheLineBreak() {
         #expect(ComposeView.edit(old: "來開會", new: "來開會\n") == ("來開會", true))

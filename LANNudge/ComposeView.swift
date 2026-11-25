@@ -8,10 +8,10 @@ struct ComposeView: View {
     @State private var effect: Effect = .cartoonShock
     @State private var text = ""
 
-    /// Four lines of body text; longer messages scroll.
+    /// Three lines of body text; longer messages scroll.
     private static let editorHeight: CGFloat = {
         let font = NSFont.preferredFont(forTextStyle: .body)
-        return (NSLayoutManager().defaultLineHeight(for: font) * 4).rounded(.up) + 8
+        return (NSLayoutManager().defaultLineHeight(for: font) * 3).rounded(.up) + 8
     }()
 
     var body: some View {

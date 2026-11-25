@@ -59,6 +59,24 @@ struct ReceiveGate {
     }
 }
 
+/// Nudges this copy sent that the receiver accepted, so a ReadReceipt is believed only from the
+/// device the nudge went to (its TLS fingerprint) and only once.
+struct SentLog {
+    var capacity = 50
+    private var entries: [(id: UUID, hint: String, name: String)] = []
+
+    mutating func remember(_ id: UUID, hint: String, name: String) {
+        entries.append((id, hint, name))
+        if entries.count > capacity { entries.removeFirst() }
+    }
+
+    /// The receiver's name when `fingerprint` is the device `id` was sent to; nil otherwise.
+    mutating func claim(_ id: UUID, from fingerprint: String) -> String? {
+        guard let index = entries.firstIndex(where: { $0.id == id && fingerprint.hasPrefix($0.hint) }) else { return nil }
+        return entries.remove(at: index).name
+    }
+}
+
 /// Nudges waiting for the screen. Bounded, with a per-sender cap so one person can't fill it,
 /// first in first out.
 struct NudgeQueue<Item> {

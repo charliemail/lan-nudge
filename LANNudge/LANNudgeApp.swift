@@ -4,6 +4,13 @@ import SwiftUI
 struct LANNudgeApp: App {
     @State private var model = AppModel()
 
+    init() {
+        // macOS turns a held letter key into the accent picker instead of repeating it. Messages here
+        // are short chat text, so a held key repeats. A registered default: an explicit system-wide
+        // choice (defaults write -g ApplePressAndHoldEnabled) still wins.
+        UserDefaults.standard.register(defaults: ["ApplePressAndHoldEnabled": false])
+    }
+
     var body: some Scene {
         MenuBarExtra("LAN Nudge", systemImage: "bolt.fill") {
             MenuContent(model: model)
@@ -37,7 +44,7 @@ private struct MenuContent: View {
         Section("附近裝置") {
             if model.peers.isEmpty { Text("沒有找到其他 Mac") }
             ForEach(model.peers) { peer in
-                Menu(model.label(for: peer)) {
+                Menu(model.label(for: peer) + (model.isBlocked(peer) ? "（已封鎖）" : "")) {
                     ForEach(Effect.allCases, id: \.self) { effect in
                         Button(effect.title) { model.nudge(peer, with: effect) }
                     }
@@ -46,11 +53,28 @@ private struct MenuContent: View {
                         model.composeTarget = peer
                         bringUp("compose")
                     }
+                    Divider()
+                    Button(model.isBlocked(peer) ? "解除封鎖" : "封鎖（不再收到他的提醒）") {
+                        model.setBlocked(!model.isBlocked(peer), hint: peer.hint, name: model.label(for: peer))
+                    }
                 }
             }
         }
 
         if let result = model.lastResult { Text(result) }
+
+        Menu("最近收到（\(model.history.count)）") {
+            if model.history.isEmpty { Text("還沒有收到提醒") }
+            ForEach(model.history) { item in
+                Text("\(item.date.formatted(date: .omitted, time: .shortened))　\(item.sender)"
+                     + (item.message.map { "：\($0)" } ?? "：\(item.effect.title)")
+                     + (item.paused ? "（暫停中）" : ""))
+            }
+            if !model.history.isEmpty {
+                Divider()
+                Button("清除紀錄") { model.clearHistory() }
+            }
+        }
 
         Divider()
         Toggle("暫停接收", isOn: $model.muted)

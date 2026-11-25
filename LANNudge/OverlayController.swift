@@ -43,6 +43,27 @@ final class OverlayController {
         return true
     }
 
+    private var toastPanel: NSPanel?
+
+    /// A short notice (a read receipt) at the top right, clear of the nudge overlay and the pet.
+    func toast(_ text: String) {
+        toastPanel?.orderOut(nil)
+        let screens = NSScreen.screens.map { (frame: $0.frame, visible: $0.visibleFrame) }
+        guard let visible = Self.visibleFrame(for: NSEvent.mouseLocation, screens: screens) else { return }
+        let size = CGSize(width: 280, height: 60)
+        let panel = OverlayPanel(contentRect: CGRect(x: visible.maxX - size.width - 16, y: visible.maxY - size.height - 8,
+                                                     width: size.width, height: size.height))
+        panel.contentView = NSHostingView(rootView: ToastView(text: text))
+        panel.orderFrontRegardless()
+        toastPanel = panel
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            guard toastPanel === panel else { return }
+            panel.orderOut(nil)
+            toastPanel = nil
+        }
+    }
+
     func hide() {
         timer?.cancel()
         timer = nil
@@ -60,6 +81,22 @@ final class OverlayController {
     nonisolated static func frame(size: CGSize, in visible: CGRect, margin: CGFloat = 16) -> CGRect {
         CGRect(x: visible.maxX - size.width - margin, y: visible.minY + margin,
                width: size.width, height: size.height)
+    }
+}
+
+private struct ToastView: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            Text(text).font(.headline).lineLimit(1)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .shadow(radius: 3)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
     }
 }
 

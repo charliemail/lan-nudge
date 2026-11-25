@@ -46,6 +46,10 @@ struct MutualTLSTests {
         }
         #expect(seenSender == a.fingerprint)
 
+        let readID = UUID()
+        #expect(await sender.sendReadReceipt(for: readID, to: peer(hint: b.fingerprint, [endpoint])) == .ack(.displayed))
+        #expect(seenCheck == .read(id: readID))
+
         // A Bonjour record claiming another device's hint can't redirect the nudge.
         seenSender = nil
         #expect(await sender.send(.shake, to: peer(hint: a.fingerprint, [endpoint])) == .noAck)

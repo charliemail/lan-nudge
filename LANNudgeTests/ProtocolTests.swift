@@ -61,6 +61,11 @@ struct RequestCheckTests {
         #expect(RequestCheck(payload) == .valid(id: id, effect: .knock, message: "來開會了", acceptsQueued: true))
     }
 
+    @Test func readReceipt() throws {
+        #expect(RequestCheck(try JSONEncoder().encode(ReadReceipt(id: id))) == .read(id: id))
+        #expect(RequestCheck(json(["version": 2, "type": "read", "id": id.uuidString])) == .invalid(id: id))
+    }
+
     /// Pre-0.4.0 senders send neither key: no message, and they can't read a `queued` ack.
     @Test func oldSenderFormat() {
         #expect(RequestCheck(json(["version": 1, "type": "nudge", "id": id.uuidString, "effect": "shake"]))
