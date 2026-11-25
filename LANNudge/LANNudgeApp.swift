@@ -44,8 +44,7 @@ private struct MenuContent: View {
                     Divider()
                     Button("附帶訊息…") {
                         model.composeTarget = peer
-                        openWindow(id: "compose")
-                        NSApp.activate()
+                        bringUp("compose")
                     }
                 }
             }
@@ -60,12 +59,22 @@ private struct MenuContent: View {
                 Button(effect.title) { model.present(effect, from: "預覽") }
             }
         }
-        Button("設定…") {
-            openWindow(id: "settings")
-            NSApp.activate()
-        }
+        Button("設定…") { bringUp("settings") }
         Divider()
         Button("結束 LAN Nudge") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
+    }
+
+    /// A menu bar app isn't the active app when its menu is used, and NSApp.activate() is only a
+    /// request macOS may turn down, so the window would open (or stay) behind the current app's
+    /// windows. Ordering it front directly works either way.
+    private func bringUp(_ id: String) {
+        openWindow(id: id)
+        DispatchQueue.main.async {
+            NSApp.activate()
+            guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix(id) == true }) else { return }
+            window.orderFrontRegardless()
+            window.makeKey()
+        }
     }
 }

@@ -46,23 +46,24 @@ struct SettingsView: View {
 
             Section("接收") {
                 Toggle("顯示對方附帶的訊息", isOn: $model.showMessages)
-                Picker("提醒顯示時間", selection: displayMode) {
-                    Text("自動").tag(false)
-                    Text("自訂").tag(true)
+                Picker("提醒消失方式", selection: $model.stickyNudges) {
+                    Text("時間到自動消失").tag(false)
+                    Text("點確認才消失").tag(true)
                 }
                 .pickerStyle(.segmented)
-                if let seconds = model.customDisplaySeconds {
-                    HStack {
-                        Slider(value: Binding(get: { Double(seconds) }, set: { model.customDisplaySeconds = Int($0.rounded()) }),
-                               in: Double(AppModel.displayRange.lowerBound)...Double(AppModel.displayRange.upperBound), step: 1)
-                        Text("\(seconds) 秒").monospacedDigit().frame(width: 44, alignment: .trailing)
-                        Button("還原預設") { model.customDisplaySeconds = nil }
+                if model.stickyNudges {
+                    Stepper("排隊上限：\(model.queueLimit) 則", value: $model.queueLimit, in: AppModel.queueLimitRange)
+                    Stepper("同一人最多：\(model.perSenderLimit) 則", value: $model.perSenderLimit, in: AppModel.perSenderRange)
+                    if model.queueLimit != AppModel.defaultQueueLimit || model.perSenderLimit != AppModel.defaultPerSenderLimit {
+                        Button("還原預設") {
+                            model.queueLimit = AppModel.defaultQueueLimit
+                            model.perSenderLimit = AppModel.defaultPerSenderLimit
+                        }
                     }
-                    Text("每則提醒都顯示這麼久。顯示期間別人再戳你會排隊（最多 5 則），設越長等越久。")
+                    Text("動畫播完後提醒會留在畫面上，點「確認」才清除，下一則接著出現；有 2 則以上未讀時，右上角顯示數量。螢幕鎖定或睡眠時收到的會先存著，解鎖後顯示。超過上限時，對方會看到「請稍後再試」。對方使用 0.4.0 以前的版本時，這段期間傳來的不會排隊。")
                         .font(.caption).foregroundStyle(.secondary)
                 } else {
-                    Text("沒附訊息：提醒小窗 2 秒，桌面寵物播一輪動畫。附訊息：3 秒加上每 10 字 1 秒，最長 8 秒。")
-                        .font(.caption).foregroundStyle(.secondary)
+                    displayTime
                 }
             }
 
@@ -110,6 +111,27 @@ struct SettingsView: View {
                 axTrusted = WindowShaker.isTrusted
                 try? await Task.sleep(for: .seconds(1))
             }
+        }
+    }
+
+    @ViewBuilder private var displayTime: some View {
+        Picker("提醒顯示時間", selection: displayMode) {
+            Text("自動").tag(false)
+            Text("自訂").tag(true)
+        }
+        .pickerStyle(.segmented)
+        if let seconds = model.customDisplaySeconds {
+            HStack {
+                Slider(value: Binding(get: { Double(seconds) }, set: { model.customDisplaySeconds = Int($0.rounded()) }),
+                       in: Double(AppModel.displayRange.lowerBound)...Double(AppModel.displayRange.upperBound), step: 1)
+                Text("\(seconds) 秒").monospacedDigit().frame(width: 44, alignment: .trailing)
+                Button("還原預設") { model.customDisplaySeconds = nil }
+            }
+            Text("每則提醒都顯示這麼久。顯示期間別人再戳你會排隊（最多 5 則），設越長等越久。")
+                .font(.caption).foregroundStyle(.secondary)
+        } else {
+            Text("沒附訊息：提醒小窗 2 秒，桌面寵物播一輪動畫。附訊息：3 秒加上每 10 字 1 秒，最長 8 秒。")
+                .font(.caption).foregroundStyle(.secondary)
         }
     }
 

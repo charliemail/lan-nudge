@@ -1,17 +1,69 @@
 import SwiftUI
 
-struct NudgeView: View {
-    let effect: Effect
+/// What a nudge's card says. `unread` is read live, so the count follows nudges that arrive while
+/// it is up; `confirm` is set only when the nudge stays until 確認 is clicked.
+struct NudgeCard {
     let sender: String
     let message: String?
-    let waiting: Int
-    let reduceMotion: Bool
-    @State private var start = Date()
+    let unread: @MainActor () -> Int
+    let confirm: (@MainActor () -> Void)?
+}
+
+/// The card's text, shared by the overlay and the desktop pet.
+struct NudgeCardText: View {
+    let card: NudgeCard
+    let title: String
 
     var body: some View {
-        TimelineView(.animation(paused: reduceMotion)) { context in
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text(title).font(.headline).lineLimit(1)
+                if card.confirm == nil, card.unread() > 1 {
+                    Text("還有 \(card.unread() - 1) 則").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            if let message = card.message {
+                Text(message).font(.body).lineLimit(3).fixedSize(horizontal: false, vertical: true)
+            }
+            if let confirm = card.confirm {
+                Button("確認", action: confirm).frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        }
+    }
+}
+
+extension View {
+    /// Unread count bubble on a sticky card, from 2 up (the one on screen counts).
+    func unreadBadge(_ card: NudgeCard) -> some View {
+        overlay(alignment: .topTrailing) {
+            let count = card.unread()
+            if card.confirm != nil, count >= 2 {
+                Text("\(count)")
+                    .font(.caption.bold())
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .frame(minWidth: 22, minHeight: 22)
+                    .background(.red, in: Capsule())
+                    .offset(x: 6, y: -8)
+            }
+        }
+    }
+}
+
+struct NudgeView: View {
+    let effect: Effect
+    let card: NudgeCard
+    /// A sticky card freezes on the Reduce Motion frame after this, instead of animating until clicked.
+    let animateFor: Double
+    let reduceMotion: Bool
+    @State private var start = Date()
+    @State private var settled = false
+
+    var body: some View {
+        TimelineView(.animation(paused: reduceMotion || settled)) { context in
             // t == 0 renders the static frame used for Reduce Motion.
-            let t = reduceMotion ? 0 : context.date.timeIntervalSince(start)
+            let t = reduceMotion || settled ? 0 : context.date.timeIntervalSince(start)
             VStack(spacing: 8) {
                 switch effect {
                 case .cartoonShock: ShockGuy(t: t)
@@ -23,6 +75,11 @@ struct NudgeView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             .padding(.bottom, 8)
         }
+        .task {
+            guard card.confirm != nil else { return }
+            try? await Task.sleep(for: .seconds(animateFor))
+            settled = true
+        }
     }
 
     private var label: some View {
@@ -32,24 +89,13 @@ struct NudgeView: View {
             case .shake: Image(systemName: "hand.point.right.fill").foregroundStyle(.yellow)
             case .knock: Image(systemName: "hand.raised.fill").foregroundStyle(.brown)
             }
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(effect == .knock ? "\(sender) 在敲你的門" : "\(sender) 戳了你一下")
-                        .font(.headline)
-                        .lineLimit(1)
-                    if waiting > 0 {
-                        Text("還有 \(waiting) 則").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                if let message {
-                    Text(message).font(.body).lineLimit(3).fixedSize(horizontal: false, vertical: true)
-                }
-            }
+            NudgeCardText(card: card, title: effect == .knock ? "\(card.sender) 在敲你的門" : "\(card.sender) 戳了你一下")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
         .shadow(radius: 4)
+        .unreadBadge(card)
     }
 
     /// Seconds from the start; shared with the knock sound so picture and sound line up.

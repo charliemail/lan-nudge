@@ -113,6 +113,33 @@ struct ReceiveGateTests {
         let empty = queue.next()
         #expect(empty == nil)
     }
+
+    @Test func stickyLimitsAllowSeveralPerSender() {
+        var queue = NudgeQueue<String>()
+        queue.capacity = 4
+        queue.perSender = 2
+        let added = [("a1", "a"), ("a2", "a"), ("a3", "a"), ("b1", "b"), ("b2", "b"), ("c1", "c")]
+            .map { queue.add($0.0, from: $0.1) }
+        #expect(added == [true, true, false, true, true, false])
+        #expect(queue.count == 4)
+    }
+}
+
+struct ComposeEditTests {
+    @Test func typedReturnSendsWithoutTheLineBreak() {
+        #expect(ComposeView.edit(old: "來開會", new: "來開會\n") == ("來開會", true))
+        #expect(ComposeView.edit(old: "來開會", new: "來\n開會") == ("來開會", true))
+    }
+
+    @Test func spacesStayAndPastedLineBreaksBecomeSpaces() {
+        #expect(ComposeView.edit(old: "a", new: "a ") == ("a ", false))
+        #expect(ComposeView.edit(old: "", new: "第一行\n第二行") == ("第一行 第二行", false))
+    }
+
+    @Test func lengthIsCapped() {
+        let long = String(repeating: "字", count: 70)
+        #expect(ComposeView.edit(old: "", new: long).text.count == NudgeMessage.maxLength)
+    }
 }
 
 struct DisplayTimeTests {

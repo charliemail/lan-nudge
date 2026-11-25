@@ -14,8 +14,8 @@ final class DesktopPet {
     }
 
     static let height: CGFloat = 180
-    /// Room for the sender line plus a 60-character message wrapped to three lines.
-    static let captionHeight: CGFloat = 100
+    /// Room for the sender line, a 60-character message wrapped to three lines, and the 確認 button.
+    static let captionHeight: CGFloat = 140
     static let minWidth: CGFloat = 260
 
     var enabled: Bool {
@@ -31,6 +31,7 @@ final class DesktopPet {
     @ObservationIgnored private let autosaveName: String
     @ObservationIgnored private var images: [Pose: NSImage] = [:]
     @ObservationIgnored private var panel: PetPanel?
+    @ObservationIgnored private var shockTask: Task<Void, Never>?
 
     init(defaults: UserDefaults, instance: String?) {
         self.defaults = defaults
@@ -70,21 +71,33 @@ final class DesktopPet {
         return Self.playDuration(of: shock)
     }
 
-    /// Shock pose for `animateFor` seconds, then idle again while the caption stays up to `showFor`.
-    func shock(_ caption: PetCaption.Content, animateFor: Double, showFor: Double) -> Bool {
+    /// Shock pose for `animateFor` seconds, then idle again while the caption stays up to `showFor`
+    /// (nil: until `dismiss()`).
+    func shock(_ card: NudgeCard, animateFor: Double, showFor: Double?) -> Bool {
         guard shockLoop != nil, let panel, let shock = images[.shock], let idle = images[.idle] else { return false }
         isShocking = true
         panel.setImage(shock)
-        panel.setCaption(caption)
+        panel.setCaption(card)
         Sounds.play(.cartoonShock)
-        Task {
+        shockTask = Task {
             try? await Task.sleep(for: .seconds(animateFor))
+            guard !Task.isCancelled else { return }
             panel.setImage(idle)
+            guard let showFor else { return }
             try? await Task.sleep(for: .seconds(max(showFor - animateFor, 0)))
-            panel.setCaption(nil)
-            isShocking = false
+            guard !Task.isCancelled else { return }
+            dismiss()
         }
         return true
+    }
+
+    func dismiss() {
+        shockTask?.cancel()
+        shockTask = nil
+        guard isShocking else { return }
+        if let idle = images[.idle] { panel?.setImage(idle) }
+        panel?.setCaption(nil)
+        isShocking = false
     }
 
     /// One full loop of the GIF, clamped so a long GIF can't hold the screen for long.
@@ -130,7 +143,7 @@ final class DesktopPet {
 /// clicks so it can be dragged; the window server still passes clicks through fully transparent pixels.
 private final class PetPanel: NSPanel {
     private let imageView = DraggableImageView()
-    private let caption = NSHostingView(rootView: PetCaption(content: .init(sender: "", message: nil, waiting: 0)))
+    private let caption = CaptionHostingView(rootView: PetCaption(card: nil))
 
     init(autosaveName: String) {
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -171,9 +184,9 @@ private final class PetPanel: NSPanel {
         imageView.image = image
     }
 
-    func setCaption(_ content: PetCaption.Content?) {
-        if let content { caption.rootView = PetCaption(content: content) }
-        caption.isHidden = content == nil
+    func setCaption(_ card: NudgeCard?) {
+        if let card { caption.rootView = PetCaption(card: card) }
+        caption.isHidden = card == nil
     }
 
     override var canBecomeKey: Bool { false }
@@ -184,33 +197,28 @@ private final class DraggableImageView: NSImageView {
     override var mouseDownCanMoveWindow: Bool { true }
 }
 
-struct PetCaption: View {
-    struct Content: Equatable {
-        let sender: String
-        let message: String?
-        /// Nudges still queued behind this one.
-        let waiting: Int
-    }
+/// A transparent view drags the window when the panel is movable by its background; the caption
+/// holds the 確認 button, so a click there must reach the button instead.
+private final class CaptionHostingView: FirstClickHostingView<PetCaption> {
+    override var mouseDownCanMoveWindow: Bool { false }
+}
 
-    let content: Content
+struct PetCaption: View {
+    let card: NudgeCard?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Image(systemName: "bolt.fill").foregroundStyle(.yellow)
-                Text("\(content.sender) 戳了你一下").font(.headline).lineLimit(1)
-                if content.waiting > 0 {
-                    Text("還有 \(content.waiting) 則").font(.caption).foregroundStyle(.secondary)
-                }
+        if let card {
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: "bolt.fill").foregroundStyle(.yellow).font(.headline)
+                NudgeCardText(card: card, title: "\(card.sender) 戳了你一下")
             }
-            if let message = content.message {
-                Text(message).font(.body).lineLimit(3).fixedSize(horizontal: false, vertical: true)
-            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .unreadBadge(card)
+            .padding(.horizontal, 10)
+            .padding(.top, 10)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 6)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }

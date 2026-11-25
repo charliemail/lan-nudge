@@ -24,6 +24,19 @@ final class AppModel {
         }
     }
     nonisolated static let displayRange = 2...15
+    /// Nudges stay on screen until 確認 is clicked instead of timing out; ones that arrive meanwhile,
+    /// or while the screen is locked or asleep, wait in the queue (limits below).
+    var stickyNudges: Bool { didSet { defaults.set(stickyNudges, forKey: "stickyNudges") } }
+    var queueLimit: Int {
+        didSet { queueLimit = Self.queueLimitRange.clamp(queueLimit); defaults.set(queueLimit, forKey: "queueLimit") }
+    }
+    var perSenderLimit: Int {
+        didSet { perSenderLimit = Self.perSenderRange.clamp(perSenderLimit); defaults.set(perSenderLimit, forKey: "perSenderLimit") }
+    }
+    nonisolated static let queueLimitRange = 1...20
+    nonisolated static let perSenderRange = 1...5
+    nonisolated static let defaultQueueLimit = 10
+    nonisolated static let defaultPerSenderLimit = 3
     /// Peer the "附帶訊息…" window sends to.
     var composeTarget: Peer?
     private(set) var peers: [Peer] = []
@@ -37,9 +50,13 @@ final class AppModel {
     @ObservationIgnored private var network: PeerNetwork?
     @ObservationIgnored private var gate = ReceiveGate()
     @ObservationIgnored private var screensAsleep = false
-    @ObservationIgnored private var queue = NudgeQueue<Pending>()
-    /// True from a nudge appearing until its display time (plus a short gap) has passed.
-    @ObservationIgnored private var showing = false
+    private var queue = NudgeQueue<Pending>()
+    /// True from a nudge appearing until its display time (plus a short gap) has passed, or until
+    /// 確認 is clicked.
+    private var showing = false
+
+    /// The nudge on screen plus the ones waiting behind it; the overlay and pet read it live.
+    var unread: Int { (showing ? 1 : 0) + queue.count }
 
     private struct Pending {
         let effect: Effect
@@ -53,6 +70,9 @@ final class AppModel {
         muted = defaults.bool(forKey: "muted")
         showMessages = defaults.object(forKey: "showMessages") as? Bool ?? true
         customDisplaySeconds = defaults.object(forKey: "customDisplaySeconds") as? Int
+        stickyNudges = defaults.bool(forKey: "stickyNudges")
+        queueLimit = defaults.object(forKey: "queueLimit") as? Int ?? Self.defaultQueueLimit
+        perSenderLimit = defaults.object(forKey: "perSenderLimit") as? Int ?? Self.defaultPerSenderLimit
         pet = DesktopPet(defaults: defaults, instance: instance)
 
         do {
@@ -63,15 +83,18 @@ final class AppModel {
 
         let center = NSWorkspace.shared.notificationCenter
         center.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.screensAsleep = true; self?.queue.removeAll() }
+            MainActor.assumeIsolated { self?.screensAsleep = true; self?.dropStaleQueue() }
         }
-        // Queued nudges are stale by the time the user is back.
-        DistributedNotificationCenter.default().addObserver(forName: .init("com.apple.screenIsLocked"), object: nil,
-                                                            queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.queue.removeAll() }
+        let distributed = DistributedNotificationCenter.default()
+        distributed.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.dropStaleQueue() }
+        }
+        // Sticky mode keeps what arrived while away and shows it once the user is back.
+        distributed.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.showNextIfIdle() }
         }
         center.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.screensAsleep = false }
+            MainActor.assumeIsolated { self?.screensAsleep = false; self?.showNextIfIdle() }
         }
         startNetworkIfReady()
     }
@@ -104,32 +127,57 @@ final class AppModel {
 
     /// While the desktop pet is visible it is the only reaction to every effect (no overlay, no window
     /// shake). Hidden pet (full-screen Space, turned off) falls back to the effect's own overlay.
-    /// When the display time is up, the next queued nudge (if any) follows.
+    /// When the display time is up (sticky mode: when 確認 is clicked), the next queued nudge follows.
     @discardableResult
     func present(_ effect: Effect, from sender: String, message: String? = nil) -> Bool {
         guard !showing else { return false }
         let petLoop = pet.shockLoop
         let time = Self.durations(custom: customDisplaySeconds, message: message,
                                   animation: petLoop ?? OverlayController.defaultDuration)
+        let stayFor: Double? = stickyNudges ? nil : time.total
+        var confirm: (@MainActor () -> Void)?
+        if stickyNudges { confirm = { [weak self] in self?.confirm() } }
+        let card = NudgeCard(sender: sender, message: message, unread: { [weak self] in self?.unread ?? 0 }, confirm: confirm)
         let shown = petLoop != nil
-            ? pet.shock(.init(sender: sender, message: message, waiting: queue.count),
-                        animateFor: time.animation, showFor: time.total)
-            : OverlayController.shared.show(effect, from: sender, message: message, waiting: queue.count, duration: time.total)
+            ? pet.shock(card, animateFor: time.animation, showFor: stayFor)
+            : OverlayController.shared.show(effect, card: card, animateFor: time.animation, duration: stayFor)
         guard shown else { return false }
         showing = true
-        Task {
-            try? await Task.sleep(for: .seconds(time.total + 0.3))
-            showing = false
-            showNext()
+        if let stayFor {
+            Task {
+                try? await Task.sleep(for: .seconds(stayFor + 0.3))
+                showing = false
+                showNext()
+            }
         }
         return true
     }
 
+    /// 確認 on a sticky nudge: clear it and show the next one.
+    func confirm() {
+        guard showing else { return }
+        pet.dismiss()
+        OverlayController.shared.hide()
+        showing = false
+        showNext()
+    }
+
     private func showNext() {
-        guard !muted, !screensAsleep, !Self.screenLocked() else { return queue.removeAll() }
+        guard !muted else { return queue.removeAll() }
+        guard !screensAsleep, !Self.screenLocked() else { return dropStaleQueue() }
         while let next = queue.next() {
             if present(next.effect, from: next.sender, message: next.message) { return }
         }
+    }
+
+    private func showNextIfIdle() {
+        if !showing { showNext() }
+    }
+
+    /// Timed nudges queued while the user is away are stale by the time they are back; sticky ones
+    /// are what the mode is for.
+    private func dropStaleQueue() {
+        if !stickyNudges { queue.removeAll() }
     }
 
     /// Automatic: the animation alone, or with a message 3 s + 1 s per 10 characters (max 8 s) so it
@@ -154,10 +202,14 @@ final class AppModel {
             // accepted with the no-pairing decision.
             let name = peers.first { sender.hasPrefix($0.hint) }.map(label) ?? "未知裝置（\(sender.prefix(4))）"
             let text = showMessages ? message : nil
-            return gate.decide(sender: sender, id: id, now: .now, muted: muted, busy: showing,
+            let away = screensAsleep || Self.screenLocked()
+            queue.capacity = stickyNudges ? queueLimit : 5
+            queue.perSender = stickyNudges ? perSenderLimit : 1
+            // Sticky mode: while away, nudges wait for the user instead of being turned away.
+            return gate.decide(sender: sender, id: id, now: .now, muted: muted, busy: showing || (stickyNudges && away),
                                acceptsQueued: acceptsQueued,
                                enqueue: { queue.add(Pending(effect: effect, sender: name, message: text), from: sender) }) {
-                !screensAsleep && !Self.screenLocked() && present(effect, from: name, message: text)
+                !away && present(effect, from: name, message: text)
             }
         }
     }
@@ -178,4 +230,8 @@ final class AppModel {
         network.start()
         self.network = network
     }
+}
+
+private extension ClosedRange<Int> {
+    func clamp(_ value: Int) -> Int { Swift.min(Swift.max(value, lowerBound), upperBound) }
 }

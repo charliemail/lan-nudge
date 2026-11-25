@@ -59,16 +59,17 @@ struct ReceiveGate {
     }
 }
 
-/// Nudges waiting for the screen. Bounded, at most one per sender so one person can't fill it,
+/// Nudges waiting for the screen. Bounded, with a per-sender cap so one person can't fill it,
 /// first in first out.
 struct NudgeQueue<Item> {
     var capacity = 5
+    var perSender = 1
     private var items: [(sender: String, item: Item)] = []
 
     var count: Int { items.count }
 
     mutating func add(_ item: Item, from sender: String) -> Bool {
-        guard items.count < capacity, !items.contains(where: { $0.sender == sender }) else { return false }
+        guard items.count < capacity, items.count(where: { $0.sender == sender }) < perSender else { return false }
         items.append((sender, item))
         return true
     }
