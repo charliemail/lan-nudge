@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct LANNudgeApp: App {
     @State private var model = AppModel()
+    @NSApplicationDelegateAdaptor private var delegate: AppDelegate
 
     init() {
         // macOS turns a held letter key into the accent picker instead of repeating it. Messages here
@@ -12,9 +13,17 @@ struct LANNudgeApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("LAN Nudge", systemImage: "bolt.fill") {
+        MenuBarExtra {
             MenuContent(model: model)
+        } label: {
+            MenuBarIcon(model: model, delegate: delegate)
         }
+
+        Window("LAN Nudge", id: "panel") {
+            ControlPanelView(model: model)
+        }
+        .windowResizability(.contentSize)
+        .defaultLaunchBehavior(.suppressed)
 
         Window("LAN Nudge 設定", id: "settings") {
             SettingsView(model: model)
@@ -33,7 +42,6 @@ struct LANNudgeApp: App {
 
 private struct MenuContent: View {
     @Bindable var model: AppModel
-    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Text(model.displayName.isEmpty ? "尚未設定名稱" : "本機：\(model.displayName)\(model.instance.map { "（實例 \($0)）" } ?? "")")
@@ -51,7 +59,7 @@ private struct MenuContent: View {
                     Divider()
                     Button("附帶訊息…") {
                         model.composeTarget = peer
-                        bringUp("compose")
+                        model.bringUp("compose")
                     }
                     Divider()
                     Button(model.isBlocked(peer) ? "解除封鎖" : "封鎖（不再收到他的提醒）") {
@@ -66,9 +74,7 @@ private struct MenuContent: View {
         Menu("最近收到的訊息（\(model.history.count)）") {
             if model.history.isEmpty { Text("還沒有收到訊息") }
             ForEach(model.history) { item in
-                Text("\(item.date.formatted(date: .omitted, time: .shortened))　\(item.sender)"
-                     + "：\(item.message)"
-                     + (item.paused ? "（暫停中）" : ""))
+                Text(item.line)
             }
             if !model.history.isEmpty {
                 Divider()
@@ -78,31 +84,61 @@ private struct MenuContent: View {
 
         Divider()
         Toggle("暫停接收", isOn: $model.muted)
-        Menu("預覽動畫") {
-            ForEach(Effect.allCases, id: \.self) { effect in
-                Button(effect.title) { model.present(effect, from: "預覽") }
-            }
-            Divider()
-            // Follows the receiving settings, so with 點確認才消失 it waits for 確認 like a real one.
-            Button("附帶訊息") { model.present(.cartoonShock, from: "預覽", message: "這是附帶訊息的預覽，對方傳來的文字會顯示在這裡。") }
-            Button("已讀回條") { model.showRead(from: "預覽") }
-        }
-        Button("設定…") { bringUp("settings") }
+        Menu("預覽動畫") { PreviewItems(model: model) }
+        Button("控制面板…") { model.bringUp("panel") }
+        Button("設定…") { model.bringUp("settings") }
         Divider()
         Button("結束 LAN Nudge") { NSApp.terminate(nil) }
             .keyboardShortcut("q")
     }
 
-    /// A menu bar app isn't the active app when its menu is used, and NSApp.activate() is only a
-    /// request macOS may turn down, so the window would open (or stay) behind the current app's
-    /// windows. Ordering it front directly works either way.
-    private func bringUp(_ id: String) {
-        openWindow(id: id)
-        DispatchQueue.main.async {
-            NSApp.activate()
-            guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix(id) == true }) else { return }
-            window.orderFrontRegardless()
-            window.makeKey()
+}
+
+/// The menu bar icon. It hands SwiftUI's window opener to the model and the relaunch hook to the
+/// app delegate, so AppKit code can open windows too.
+private struct MenuBarIcon: View {
+    let model: AppModel
+    let delegate: AppDelegate
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Image(systemName: "bolt.fill")
+            .onAppear {
+                model.openWindow = openWindow
+                delegate.onReopen = { [weak model] in model?.bringUp("panel") }
+            }
+    }
+}
+
+/// Opening the app again (Spotlight, Finder) while it runs shows the control panel: the way back
+/// when the menu bar icon is crowded out and the desktop pet is off.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    var onReopen: (() -> Void)?
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        onReopen?()
+        return false
+    }
+}
+
+/// Shared by the menu bar menu and the control panel.
+struct PreviewItems: View {
+    let model: AppModel
+
+    var body: some View {
+        ForEach(Effect.allCases, id: \.self) { effect in
+            Button(effect.title) { model.present(effect, from: "預覽") }
         }
+        Divider()
+        // Follows the receiving settings, so with 點確認才消失 it waits for 確認 like a real one.
+        Button("附帶訊息") { model.present(.cartoonShock, from: "預覽", message: "這是附帶訊息的預覽，對方傳來的文字會顯示在這裡。") }
+        Button("已讀回條") { model.showRead(from: "預覽") }
+    }
+}
+
+extension Bundle {
+    /// "0.5.0 (6)"
+    var versionText: String {
+        "\(infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") (\(infoDictionary?["CFBundleVersion"] as? String ?? "?"))"
     }
 }

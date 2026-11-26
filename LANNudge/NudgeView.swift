@@ -1,3 +1,4 @@
+import ImageIO
 import SwiftUI
 
 /// What a nudge's card says. `unread` is read live, so the count follows nudges that arrive while
@@ -47,6 +48,35 @@ extension View {
                     .background(.red, in: Capsule())
                     .offset(x: 6, y: -8)
             }
+        }
+    }
+}
+
+extension Effect {
+    var tint: Color {
+        switch self {
+        case .cartoonShock, .shake: .yellow
+        case .knock: .brown
+        case .funnyFace: .pink
+        }
+    }
+}
+
+/// The effect's icon; 做鬼臉 uses the first frame of the author's character so it matches what the
+/// receiver sees.
+struct EffectIcon: View {
+    let effect: Effect
+
+    nonisolated static let face: CGImage? = Bundle.main.url(forResource: "Face", withExtension: "apng")
+        .flatMap { CGImageSourceCreateWithURL($0 as CFURL, nil) }
+        .flatMap { CGImageSourceCreateThumbnailAtIndex($0, 0, [kCGImageSourceCreateThumbnailFromImageAlways: true,
+                                                               kCGImageSourceThumbnailMaxPixelSize: 64] as CFDictionary) }
+
+    var body: some View {
+        if effect == .funnyFace, let face = Self.face {
+            Image(decorative: face, scale: 1).resizable().scaledToFit().frame(width: 18, height: 18)
+        } else {
+            Image(systemName: effect.symbol).foregroundStyle(effect.tint)
         }
     }
 }
@@ -113,12 +143,7 @@ struct NudgeView: View {
 
     private var label: some View {
         HStack(spacing: 8) {
-            switch effect {
-            case .cartoonShock: Image(systemName: "bolt.fill").foregroundStyle(.yellow)
-            case .shake: Image(systemName: "hand.point.right.fill").foregroundStyle(.yellow)
-            case .knock: Image(systemName: "hand.raised.fill").foregroundStyle(.brown)
-            case .funnyFace: Image(systemName: "face.smiling.inverse").foregroundStyle(.pink)
-            }
+            EffectIcon(effect: effect)
             NudgeCardText(card: card, title: title)
         }
         .padding(.horizontal, 14)

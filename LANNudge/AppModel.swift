@@ -2,6 +2,7 @@ import AppKit
 import CoreGraphics
 import Foundation
 import Observation
+import SwiftUI
 
 @MainActor @Observable
 final class AppModel {
@@ -56,6 +57,9 @@ final class AppModel {
     private(set) var blocked: [String: String]
     /// Peer the "附帶訊息…" window sends to.
     var composeTarget: Peer?
+    /// SwiftUI's window opener, for AppKit callers (the desktop pet, a relaunch). Set by the menu bar
+    /// icon: the one view that exists for the app's whole life, even when crowded off the menu bar.
+    @ObservationIgnored var openWindow: OpenWindowAction?
     private(set) var peers: [Peer] = []
     private(set) var networkProblem: String?
     private(set) var identityError: String?
@@ -99,6 +103,10 @@ final class AppModel {
         let message: String
         /// Arrived while receiving was paused, so it wasn't shown.
         let paused: Bool
+
+        var line: String {
+            "\(date.formatted(date: .omitted, time: .shortened))　\(sender)：\(message)" + (paused ? "（暫停中）" : "")
+        }
     }
 
     init() {
@@ -114,6 +122,7 @@ final class AppModel {
         historyLimit = defaults.object(forKey: "historyLimit") as? Int ?? Self.defaultHistoryLimit
         blocked = defaults.dictionary(forKey: "blocked") as? [String: String] ?? [:]
         pet = DesktopPet(defaults: defaults, instance: instance)
+        pet.onDoubleClick = { [weak self] in self?.bringUp("panel") }
 
         do {
             identity = try LocalIdentity.loadOrCreate(label: "LAN Nudge Identity" + (instance.map { " \($0)" } ?? ""))
@@ -147,6 +156,19 @@ final class AppModel {
     }
 
     func clearHistory() { history.removeAll() }
+
+    /// A menu bar app isn't the active app when its menu is used, and NSApp.activate() is only a
+    /// request macOS may turn down, so the window would open (or stay) behind the current app's
+    /// windows. Ordering it front directly works either way.
+    func bringUp(_ id: String) {
+        openWindow?(id: id)
+        DispatchQueue.main.async {
+            NSApp.activate()
+            guard let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix(id) == true }) else { return }
+            window.orderFrontRegardless()
+            window.makeKey()
+        }
+    }
 
     /// The desktop pet's read-receipt GIF, or a notice at the top right when the pet can't show it.
     func showRead(from name: String) {

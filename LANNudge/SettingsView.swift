@@ -128,6 +128,7 @@ struct SettingsView: View {
             }
 
             Section {
+                LabeledContent("版本", value: Bundle.main.versionText)
                 LabeledContent("授權條款") {
                     Button("開啟…") {
                         if let url = Bundle.main.url(forResource: "Licenses", withExtension: "txt") {

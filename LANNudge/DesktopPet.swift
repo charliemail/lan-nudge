@@ -42,6 +42,8 @@ final class DesktopPet {
     @ObservationIgnored private var images: [Pose: PetAnimation] = [:]
     @ObservationIgnored private var panel: PetPanel?
     @ObservationIgnored private var shockTask: Task<Void, Never>?
+    /// Double-clicking the character (not its caption) opens the control panel.
+    @ObservationIgnored var onDoubleClick: (() -> Void)?
 
     init(defaults: UserDefaults, instance: String?) {
         self.defaults = defaults
@@ -162,6 +164,7 @@ final class DesktopPet {
             return
         }
         let panel = self.panel ?? PetPanel(autosaveName: autosaveName)
+        panel.onDoubleClick = { [weak self] in self?.onDoubleClick?() }
         if !isShocking { panel.setImage(idle) }
         panel.orderFrontRegardless()
         self.panel = panel
@@ -173,6 +176,7 @@ final class DesktopPet {
 private final class PetPanel: NSPanel {
     private let imageView = PetImageView()
     private let caption = CaptionHostingView(rootView: PetCaption(card: nil, title: "", symbol: ""))
+    var onDoubleClick: (() -> Void)?
 
     init(autosaveName: String) {
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -214,6 +218,18 @@ private final class PetPanel: NSPanel {
     func setCaption(_ card: NudgeCard?, title: String = "", symbol: String = "") {
         if let card { caption.rootView = PetCaption(card: card, title: title, symbol: symbol) }
         caption.isHidden = card == nil
+    }
+
+    /// Caught here rather than in the image view: the view lets a mouse-down drag the window, and a
+    /// window drag never hands the click to the view. The first click still drags; only the second
+    /// of a double-click on the character is taken.
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown, event.clickCount == 2, let onDoubleClick,
+           imageView.frame.contains(contentView?.convert(event.locationInWindow, from: nil) ?? .zero) {
+            onDoubleClick()
+            return
+        }
+        super.sendEvent(event)
     }
 
     override var canBecomeKey: Bool { false }

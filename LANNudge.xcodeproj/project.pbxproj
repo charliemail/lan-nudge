@@ -32,6 +32,7 @@
 		C554E15257A556D0549AEB73 /* ReceiveGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D092F7D48001727B7B90AC0 /* ReceiveGate.swift */; };
 		C6043311EA8FB59151B5B611 /* Licenses.txt in Resources */ = {isa = PBXBuildFile; fileRef = 206FAA4623B47A400586890B /* Licenses.txt */; };
 		E531AC3FA67ACC53DE123157 /* Face.apng in Resources */ = {isa = PBXBuildFile; fileRef = B182C8BCB2B2AAA2A2C133F0 /* Face.apng */; };
+		F0F0B301202269128167AE93 /* ControlPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07969B3B57000B5A04908EA2 /* ControlPanelView.swift */; };
 		FF4BC9235246C3F7B794CE90 /* PeerNetwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A36599CA4BF33858469B2D6 /* PeerNetwork.swift */; };
 /* End PBXBuildFile section */
 
@@ -47,6 +48,7 @@
 
 /* Begin PBXFileReference section */
 		01082B9C1E1B9B17961BCAAD /* ProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolTests.swift; sourceTree = "<group>"; };
+		07969B3B57000B5A04908EA2 /* ControlPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlPanelView.swift; sourceTree = "<group>"; };
 		0E1F77CCA0975AFE234B4865 /* DesktopPet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPet.swift; sourceTree = "<group>"; };
 		16A6B6CE832952D5F566B23B /* WindowShaker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowShaker.swift; sourceTree = "<group>"; };
 		18391F28003CB4F55F212096 /* ComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeView.swift; sourceTree = "<group>"; };
@@ -126,6 +128,7 @@
 				CAD012FA7C27799249D50E5F /* AppModel.swift */,
 				50713D6661AFC302BC8BF45B /* Assets.xcassets */,
 				18391F28003CB4F55F212096 /* ComposeView.swift */,
+				07969B3B57000B5A04908EA2 /* ControlPanelView.swift */,
 				0E1F77CCA0975AFE234B4865 /* DesktopPet.swift */,
 				B182C8BCB2B2AAA2A2C133F0 /* Face.apng */,
 				47562DB5D519568C5D6E8868 /* Identity.swift */,
@@ -254,6 +257,7 @@
 			files = (
 				4D0D5BDE8105D12181FC3666 /* AppModel.swift in Sources */,
 				2989F4F60D5316235D3046F6 /* ComposeView.swift in Sources */,
+				F0F0B301202269128167AE93 /* ControlPanelView.swift in Sources */,
 				B92253D1F6845B790F64D0E8 /* DesktopPet.swift in Sources */,
 				B86D86D4B2B4329A4FBFEE93 /* Identity.swift in Sources */,
 				2FD8DF29DBA3877B28A1276E /* LANNudgeApp.swift in Sources */,

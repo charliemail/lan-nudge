@@ -14,6 +14,17 @@ enum Effect: String, Codable, CaseIterable, Sendable {
         case .funnyFace: "做鬼臉"
         }
     }
+
+    /// SF Symbol for menus, the control panel and the nudge card. 做鬼臉 shows the character itself
+    /// (`EffectIcon`); its symbol is the fallback.
+    var symbol: String {
+        switch self {
+        case .cartoonShock: "bolt.fill"
+        case .shake: "iphone.radiowaves.left.and.right"
+        case .knock: "door.left.hand.closed"
+        case .funnyFace: "theatermasks.fill"
+        }
+    }
 }
 
 enum Wire {

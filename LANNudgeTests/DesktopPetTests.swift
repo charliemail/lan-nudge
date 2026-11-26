@@ -69,6 +69,10 @@ struct DesktopPetTests {
         #expect(abs(face.loopDuration - 2) < 0.01)
     }
 
+    @Test func funnyFaceIconIsTheCharacter() {
+        #expect(EffectIcon.face != nil)
+    }
+
     @Test(arguments: ["Pet-idle", "Pet-shock", "Pet-read"])
     func bundledDefaultLoadsAndAnimates(_ name: String) throws {
         let url = try #require(Bundle.main.url(forResource: name, withExtension: "gif"))
