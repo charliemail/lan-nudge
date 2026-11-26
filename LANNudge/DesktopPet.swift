@@ -1,11 +1,13 @@
 import AppKit
+import ImageIO
 import Observation
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Character that idles on the desktop, plays a "shocked" GIF on any nudge and a read-receipt GIF
-/// when a nudge the user sent is read. Default GIFs ship in the bundle (Pet-idle/-shock/-read.gif);
-/// a GIF the user picks is copied into Application Support and takes precedence.
+/// Character that idles on the desktop, plays a "shocked" animation on any nudge and a read-receipt
+/// animation when a nudge the user sent is read. Default GIFs ship in the bundle
+/// (Pet-idle/-shock/-read.gif); a GIF or WebP the user picks is copied into Application Support and
+/// takes precedence.
 @MainActor @Observable
 final class DesktopPet {
     enum Pose: String, CaseIterable {
@@ -35,7 +37,7 @@ final class DesktopPet {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let directory: URL
     @ObservationIgnored private let autosaveName: String
-    @ObservationIgnored private var images: [Pose: NSImage] = [:]
+    @ObservationIgnored private var images: [Pose: PetAnimation] = [:]
     @ObservationIgnored private var panel: PetPanel?
     @ObservationIgnored private var shockTask: Task<Void, Never>?
 
@@ -48,21 +50,25 @@ final class DesktopPet {
         refresh()
     }
 
-    /// Asks for a GIF and copies it in, so moving or deleting the original doesn't break the pet.
+    static let imageTypes: [UTType] = [.gif, .webP]
+
+    /// Asks for a GIF or WebP and copies it in, so moving or deleting the original doesn't break the pet.
     func choose(_ pose: Pose) {
         let open = NSOpenPanel()
-        open.allowedContentTypes = [.gif]
-        open.message = "選擇\(pose.title)（GIF）"
+        open.allowedContentTypes = Self.imageTypes
+        open.message = "選擇\(pose.title)（GIF 或 WebP）"
         guard open.runModal() == .OK, let source = open.url else { return }
-        guard NSImage(contentsOf: source)?.isValid == true else {
-            error = "讀不到這張 GIF：\(source.lastPathComponent)"
+        // The stored extension follows the content, not the file name.
+        guard PetAnimation(url: source) != nil,
+              let type = CGImageSourceCreateWithURL(source as CFURL, nil).flatMap(CGImageSourceGetType).flatMap({ UTType($0 as String) }),
+              let ext = Self.imageTypes.first(where: type.conforms)?.preferredFilenameExtension else {
+            error = "讀不到這張圖，或動畫太大（尺寸 × 格數過多）：\(source.lastPathComponent)"
             return
         }
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let target = customURL(pose)
-            try? FileManager.default.removeItem(at: target)
-            try FileManager.default.copyItem(at: source, to: target)
+            removeCustom(pose)
+            try FileManager.default.copyItem(at: source, to: directory.appending(path: "\(pose.rawValue).\(ext)"))
             error = nil
         } catch {
             self.error = "無法儲存圖片：\(error.localizedDescription)"
@@ -74,7 +80,7 @@ final class DesktopPet {
     /// current Space, e.g. a full-screen app), so the caller falls back to the overlay.
     var shockLoop: Double? {
         guard let panel, panel.isOnActiveSpace, !isShocking, let shock = images[.shock] else { return nil }
-        return Self.playDuration(of: shock)
+        return shock.playDuration
     }
 
     /// Shock pose for `animateFor` seconds, then idle again while the caption stays up to `showFor`
@@ -104,7 +110,7 @@ final class DesktopPet {
         isShocking = true
         panel.setImage(image)
         panel.setCaption(NudgeCard(sender: "", message: nil, unread: { 0 }, confirm: nil), title: text, symbol: "checkmark.circle.fill")
-        let loop = Self.playDuration(of: image)
+        let loop = image.playDuration
         shockTask = Task {
             try? await Task.sleep(for: .seconds(max(loop, 2)))
             guard !Task.isCancelled else { return }
@@ -122,31 +128,26 @@ final class DesktopPet {
         isShocking = false
     }
 
-    /// One full loop of the GIF, clamped so a long GIF can't hold the screen for long.
-    nonisolated static func playDuration(of image: NSImage) -> Double {
-        guard let rep = image.representations.first as? NSBitmapImageRep,
-              let frames = rep.value(forProperty: .frameCount) as? Int, frames > 1 else { return 2 }
-        let total = (0..<frames).reduce(0.0) { sum, i in
-            rep.setProperty(.currentFrame, withValue: i)
-            return sum + ((rep.value(forProperty: .currentFrameDuration) as? Double) ?? 0.1)
-        }
-        rep.setProperty(.currentFrame, withValue: 0)
-        return min(max(total, 1), 5)
-    }
-
     func restoreDefault(_ pose: Pose) {
-        try? FileManager.default.removeItem(at: customURL(pose))
+        removeCustom(pose)
         refresh()
     }
 
-    private func customURL(_ pose: Pose) -> URL { directory.appending(path: "\(pose.rawValue).gif") }
+    private func customURLs(_ pose: Pose) -> [URL] {
+        Self.imageTypes.compactMap(\.preferredFilenameExtension).map { directory.appending(path: "\(pose.rawValue).\($0)") }
+    }
+
+    private func customURL(_ pose: Pose) -> URL? { customURLs(pose).first { FileManager.default.fileExists(atPath: $0.path) } }
+
+    private func removeCustom(_ pose: Pose) {
+        for url in customURLs(pose) { try? FileManager.default.removeItem(at: url) }
+    }
 
     private func refresh() {
-        customPoses = Set(Pose.allCases.filter { FileManager.default.fileExists(atPath: customURL($0).path) })
+        customPoses = Set(Pose.allCases.filter { customURL($0) != nil })
         images = Dictionary(uniqueKeysWithValues: Pose.allCases.compactMap { pose in
-            let url = customPoses.contains(pose) ? customURL(pose)
-                : Bundle.main.url(forResource: "Pet-\(pose.rawValue)", withExtension: "gif")
-            return url.flatMap(NSImage.init(contentsOf:)).map { (pose, $0) }
+            let url = customURL(pose) ?? Bundle.main.url(forResource: "Pet-\(pose.rawValue)", withExtension: "gif")
+            return url.flatMap { PetAnimation(url: $0) }.map { (pose, $0) }
         })
         hasImages = images[.idle] != nil && images[.shock] != nil
         guard enabled, hasImages, let idle = images[.idle] else {
@@ -164,7 +165,7 @@ final class DesktopPet {
 /// Floats above windows on every Space except full-screen ones. Unlike the overlay it takes mouse
 /// clicks so it can be dragged; the window server still passes clicks through fully transparent pixels.
 private final class PetPanel: NSPanel {
-    private let imageView = DraggableImageView()
+    private let imageView = PetImageView()
     private let caption = CaptionHostingView(rootView: PetCaption(card: nil, title: "", symbol: ""))
 
     init(autosaveName: String) {
@@ -178,8 +179,6 @@ private final class PetPanel: NSPanel {
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
 
-        imageView.imageScaling = .scaleProportionallyUpOrDown
-        imageView.animates = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         caption.isHidden = true
         let container = NSView()
         container.addSubview(imageView)
@@ -195,15 +194,15 @@ private final class PetPanel: NSPanel {
     }
 
     /// Sized from the image's aspect ratio; the caption strip sits under the character.
-    func setImage(_ image: NSImage) {
-        let width = (DesktopPet.height * image.size.width / max(image.size.height, 1)).rounded()
+    func setImage(_ image: PetAnimation) {
+        let width = (DesktopPet.height * image.aspectRatio).rounded()
         let size = CGSize(width: max(width, DesktopPet.minWidth), height: DesktopPet.height + DesktopPet.captionHeight)
         if frame.size != size {
             setFrame(CGRect(x: frame.midX - size.width / 2, y: frame.minY, width: size.width, height: size.height), display: true)
         }
         imageView.frame = CGRect(x: 0, y: DesktopPet.captionHeight, width: size.width, height: DesktopPet.height)
         caption.frame = CGRect(x: 0, y: 0, width: size.width, height: DesktopPet.captionHeight)
-        imageView.image = image
+        imageView.play(image)
     }
 
     func setCaption(_ card: NudgeCard?, title: String = "", symbol: String = "") {
@@ -215,8 +214,89 @@ private final class PetPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-private final class DraggableImageView: NSImageView {
+/// Plays the frames itself: NSImageView only animates GIFs (NSBitmapImageRep has no frame count for
+/// WebP). Layer-hosting, so AppKit never redraws over the layer's contents.
+private final class PetImageView: NSView {
     override var mouseDownCanMoveWindow: Bool { true }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        let layer = CALayer()
+        layer.contentsGravity = .resizeAspect
+        self.layer = layer
+        wantsLayer = true
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    /// Restarts from the first frame; with Reduce Motion on, shows only that frame.
+    func play(_ animation: PetAnimation) {
+        guard let layer else { return }
+        layer.removeAnimation(forKey: "frames")
+        layer.contents = animation.frames[0]
+        guard animation.frames.count > 1, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        let frames = CAKeyframeAnimation(keyPath: "contents")
+        frames.values = animation.frames
+        frames.keyTimes = animation.keyTimes.map { NSNumber(value: $0) }
+        frames.calculationMode = .discrete
+        frames.duration = animation.loopDuration
+        frames.repeatCount = .infinity
+        layer.add(frames, forKey: "frames")
+    }
+}
+
+/// Every frame of an animated GIF or WebP, decoded once by ImageIO (which also composites WebP
+/// frames), scaled down to what the pet can show.
+struct PetAnimation {
+    /// The pet is 180 pt tall, so 400 px keeps square-ish art sharp on Retina.
+    static let maxPixelSize = 400
+    // ponytail: whole animation held in memory, refused past the cap; stream frames if longer art is needed.
+    static let maxBytes = 96 << 20
+
+    let frames: [CGImage]
+    let delays: [Double]
+
+    init?(url: URL, maxBytes: Int = maxBytes) {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        self.init(source: source, maxBytes: maxBytes)
+    }
+
+    init?(data: Data, maxBytes: Int = maxBytes) {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        self.init(source: source, maxBytes: maxBytes)
+    }
+
+    private init?(source: CGImageSource, maxBytes: Int) {
+        let count = CGImageSourceGetCount(source)
+        let options = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true,
+                       kCGImageSourceThumbnailMaxPixelSize: Self.maxPixelSize] as CFDictionary
+        var frames: [CGImage] = []
+        var delays: [Double] = []
+        for index in 0..<count {
+            guard let frame = CGImageSourceCreateThumbnailAtIndex(source, index, options),
+                  frame.bytesPerRow * frame.height * count <= maxBytes else { return nil }
+            frames.append(frame)
+            delays.append(Self.delay(CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any]))
+        }
+        guard !frames.isEmpty else { return nil }
+        self.frames = frames
+        self.delays = delays
+    }
+
+    /// ImageIO's clamped delay, as browsers play it: a missing or near-zero delay means 0.1 s.
+    private static func delay(_ properties: [CFString: Any]?) -> Double {
+        let delay = [(kCGImagePropertyGIFDictionary, kCGImagePropertyGIFDelayTime),
+                     (kCGImagePropertyWebPDictionary, kCGImagePropertyWebPDelayTime)]
+            .lazy.compactMap { (properties?[$0.0] as? [CFString: Any])?[$0.1] as? Double }.first
+        return delay.map { $0 > 0.01 ? $0 : 0.1 } ?? 0.1
+    }
+
+    var aspectRatio: CGFloat { CGFloat(frames[0].width) / CGFloat(max(frames[0].height, 1)) }
+    var loopDuration: Double { delays.reduce(0, +) }
+    /// Start of each frame as a share of the loop, plus the closing 1 that `.discrete` needs.
+    var keyTimes: [Double] { delays.reduce(into: [0]) { $0.append($0.last! + $1) }.map { $0 / loopDuration } }
+    /// One full loop, clamped so a long animation can't hold the screen for long.
+    var playDuration: Double { frames.count > 1 ? min(max(loopDuration, 1), 5) : 2 }
 }
 
 /// A transparent view drags the window when the panel is movable by its background; the caption
