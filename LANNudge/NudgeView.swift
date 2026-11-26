@@ -62,6 +62,17 @@ struct NudgeView: View {
     var scale: CGFloat = 1
     @State private var start = Date()
     @State private var settled = false
+    /// Decoded per nudge (~0.1 s) and freed with the overlay rather than kept for the app's lifetime.
+    private let face: PetAnimation?
+
+    init(effect: Effect, card: NudgeCard, animateFor: Double, reduceMotion: Bool, scale: CGFloat = 1) {
+        self.effect = effect
+        self.card = card
+        self.animateFor = animateFor
+        self.reduceMotion = reduceMotion
+        self.scale = scale
+        face = effect == .funnyFace ? FunnyFace.load() : nil
+    }
 
     nonisolated static let characterSize = CGSize(width: 150, height: 120)
 
@@ -79,6 +90,7 @@ struct NudgeView: View {
                     Group {
                         switch effect {
                         case .cartoonShock: ShockGuy(t: t)
+                        case .funnyFace: FunnyFace(t: t, image: face)
                         default: KnockDoor(t: t)
                         }
                     }
@@ -105,8 +117,9 @@ struct NudgeView: View {
             case .cartoonShock: Image(systemName: "bolt.fill").foregroundStyle(.yellow)
             case .shake: Image(systemName: "hand.point.right.fill").foregroundStyle(.yellow)
             case .knock: Image(systemName: "hand.raised.fill").foregroundStyle(.brown)
+            case .funnyFace: Image(systemName: "face.smiling.inverse").foregroundStyle(.pink)
             }
-            NudgeCardText(card: card, title: effect == .knock ? "\(card.sender) 在敲你的門" : "\(card.sender) 戳了你一下")
+            NudgeCardText(card: card, title: title)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -115,8 +128,18 @@ struct NudgeView: View {
         .unreadBadge(card)
     }
 
+    private var title: String {
+        switch effect {
+        case .knock: "\(card.sender) 在敲你的門"
+        case .funnyFace: "\(card.sender) 對你做鬼臉"
+        default: "\(card.sender) 戳了你一下"
+        }
+    }
+
     /// Seconds from the start; shared with the knock sound so picture and sound line up.
     nonisolated static let knockTimes: [Double] = [0, 0.22, 0.44]
+    /// When each 「略」 pops in, after the character has bounced up; shared with the sound.
+    nonisolated static let faceTimes: [Double] = [0.35, 0.6, 0.85]
 
     /// ~9 Hz side-to-side, decaying to rest after ~1.1 s.
     nonisolated static func shakeOffset(_ t: Double) -> CGFloat {
@@ -211,5 +234,58 @@ private struct KnockDoor: View {
             }
         }
         .frame(width: 150, height: 110)
+    }
+}
+
+/// The author's animated character bounces up from below, wobbles, and taunts 「略略略」.
+private struct FunnyFace: View {
+    let t: Double
+    let image: PetAnimation?
+
+    /// The author's WebP, shipped as a lossless APNG with identical frames: ImageIO redecodes an
+    /// animated WebP from its first frame for every frame (40 frames took ~2 s), an APNG ~0.1 s.
+    /// Kept up to 720 px since it shows ~360 pt tall.
+    nonisolated static func load() -> PetAnimation? {
+        Bundle.main.url(forResource: "Face", withExtension: "apng").flatMap { PetAnimation(url: $0, maxPixelSize: 720) }
+    }
+
+    var body: some View {
+        // Reduce Motion (t == 0) shows the character at rest with all three 「略」.
+        let rise = t == 0 ? 1 : Self.easeOutBack(min(t / 0.35, 1))
+        let wobble = t == 0 ? 0 : sin(t * 2 * .pi * 3) * 8 * max(0, 1 - t / 1.6)
+
+        HStack(alignment: .center, spacing: 4) {
+            Group {
+                if let image {
+                    Image(decorative: image.frame(at: t), scale: 1).resizable().scaledToFit()
+                } else {
+                    Text("😜").font(.system(size: 80))
+                }
+            }
+            .frame(height: 112)
+            .rotationEffect(.degrees(wobble), anchor: .bottom)
+            .offset(y: (1 - rise) * 70)
+            .opacity(min(1, rise * 3))
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(NudgeView.faceTimes.indices, id: \.self) { i in
+                    let since = t - NudgeView.faceTimes[i]
+                    let shown = t == 0 || since >= 0
+                    let pop = t == 0 ? 1 : 1 + max(0, 0.4 - since * 3)
+                    Text("略")
+                        .font(.system(size: 20, weight: .heavy))
+                        .foregroundStyle(.pink)
+                        .opacity(shown ? 1 : 0)
+                        .scaleEffect(shown ? pop : 0.5)
+                        .offset(x: CGFloat(i) * 6)
+                }
+            }
+        }
+        .frame(width: 150, height: 120)
+    }
+
+    /// Overshoots a little before settling, so the character pops up rather than slides.
+    nonisolated static func easeOutBack(_ x: Double) -> Double {
+        let c = 1.70158
+        return 1 + (c + 1) * pow(x - 1, 3) + c * pow(x - 1, 2)
     }
 }

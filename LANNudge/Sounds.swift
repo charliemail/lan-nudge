@@ -18,6 +18,7 @@ enum Sounds {
         case .cartoonShock: zap(seconds: 1.6)
         case .shake: rattle(seconds: 1.1)
         case .knock: knock()
+        case .funnyFace: taunt()
         }
     }
 
@@ -55,6 +56,29 @@ enum Sounds {
                 let wood = (sin(2 * .pi * 170 * t) + 0.5 * sin(2 * .pi * 310 * t)) * exp(-t / 0.018)
                 let click = Double.random(in: -1...1, using: &rng) * exp(-t / 0.002)
                 out[offset + j] += Float(wood * 0.4 + click * 0.3)
+            }
+        }
+        return out
+    }
+
+    /// A rising "boing" as the character pops up, then three nasal 「略」 blips that fall in pitch.
+    nonisolated private static func taunt() -> [Float] {
+        var out = [Float](repeating: 0, count: Int(1.1 * sampleRate))
+        var phase = 0.0
+        for j in 0..<Int(0.3 * sampleRate) {
+            let t = Double(j) / sampleRate
+            phase += 2 * .pi * (180 + 900 * t) / sampleRate
+            out[j] += Float(sin(phase) * 0.45 * min(1, t / 0.01) * exp(-t / 0.12))
+        }
+        for start in NudgeView.faceTimes {
+            let offset = Int(start * sampleRate)
+            var phase = 0.0
+            for j in 0..<Int(0.16 * sampleRate) where offset + j < out.count {
+                let t = Double(j) / sampleRate
+                phase += 2 * .pi * (620 - 1000 * t + 25 * sin(2 * .pi * 30 * t)) / sampleRate
+                // Square-ish wave through a soft clip: a buzzy, nasal "leh".
+                let tone = tanh(3 * sin(phase)) * 0.3
+                out[offset + j] += Float(tone * min(1, t / 0.008) * exp(-t / 0.07))
             }
         }
         return out

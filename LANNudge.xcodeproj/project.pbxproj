@@ -31,6 +31,7 @@
 		C4E9B4B3ED7BB5FAFCA6176B /* X509 in Frameworks */ = {isa = PBXBuildFile; productRef = F680C3A5964E97EAC88AF865 /* X509 */; };
 		C554E15257A556D0549AEB73 /* ReceiveGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D092F7D48001727B7B90AC0 /* ReceiveGate.swift */; };
 		C6043311EA8FB59151B5B611 /* Licenses.txt in Resources */ = {isa = PBXBuildFile; fileRef = 206FAA4623B47A400586890B /* Licenses.txt */; };
+		E531AC3FA67ACC53DE123157 /* Face.apng in Resources */ = {isa = PBXBuildFile; fileRef = B182C8BCB2B2AAA2A2C133F0 /* Face.apng */; };
 		FF4BC9235246C3F7B794CE90 /* PeerNetwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A36599CA4BF33858469B2D6 /* PeerNetwork.swift */; };
 /* End PBXBuildFile section */
 
@@ -63,6 +64,7 @@
 		94D028BA01224165E4BA7515 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		AB1BC42DB5ED0D832A1761AD /* Pet-shock.gif */ = {isa = PBXFileReference; lastKnownFileType = image.gif; path = "Pet-shock.gif"; sourceTree = "<group>"; };
 		B069E1CFF3C8F085FEB1E583 /* Pet-read.gif */ = {isa = PBXFileReference; lastKnownFileType = image.gif; path = "Pet-read.gif"; sourceTree = "<group>"; };
+		B182C8BCB2B2AAA2A2C133F0 /* Face.apng */ = {isa = PBXFileReference; path = Face.apng; sourceTree = "<group>"; };
 		B19E3A4355936C5059FC5998 /* DesktopPetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopPetTests.swift; sourceTree = "<group>"; };
 		B4610106FE0403654B0C7D0F /* LANNudgeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LANNudgeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BAB9C7AD79105949F9879ED1 /* ReceiveGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiveGateTests.swift; sourceTree = "<group>"; };
@@ -125,6 +127,7 @@
 				50713D6661AFC302BC8BF45B /* Assets.xcassets */,
 				18391F28003CB4F55F212096 /* ComposeView.swift */,
 				0E1F77CCA0975AFE234B4865 /* DesktopPet.swift */,
+				B182C8BCB2B2AAA2A2C133F0 /* Face.apng */,
 				47562DB5D519568C5D6E8868 /* Identity.swift */,
 				94D028BA01224165E4BA7515 /* Info.plist */,
 				21123F621134C12F5722BEFC /* LANNudge.entitlements */,
@@ -234,6 +237,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				591BDF2A5A219CAA8674FA58 /* Assets.xcassets in Resources */,
+				E531AC3FA67ACC53DE123157 /* Face.apng in Resources */,
 				C6043311EA8FB59151B5B611 /* Licenses.txt in Resources */,
 				2553DDA9F5AFE0A243E4FD4B /* Pet-idle.gif in Resources */,
 				B4482D38D4F9B7EB57250277 /* Pet-read.gif in Resources */,

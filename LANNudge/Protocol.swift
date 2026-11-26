@@ -4,12 +4,14 @@ enum Effect: String, Codable, CaseIterable, Sendable {
     case cartoonShock
     case shake
     case knock
+    case funnyFace
 
     var title: String {
         switch self {
         case .cartoonShock: "小人觸電"
         case .shake: "視窗震動"
         case .knock: "敲門"
+        case .funnyFace: "做鬼臉"
         }
     }
 }

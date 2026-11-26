@@ -256,20 +256,20 @@ struct PetAnimation {
     let frames: [CGImage]
     let delays: [Double]
 
-    init?(url: URL, maxBytes: Int = maxBytes) {
+    init?(url: URL, maxPixelSize: Int = maxPixelSize, maxBytes: Int = maxBytes) {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        self.init(source: source, maxBytes: maxBytes)
+        self.init(source: source, maxPixelSize: maxPixelSize, maxBytes: maxBytes)
     }
 
-    init?(data: Data, maxBytes: Int = maxBytes) {
+    init?(data: Data, maxPixelSize: Int = maxPixelSize, maxBytes: Int = maxBytes) {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
-        self.init(source: source, maxBytes: maxBytes)
+        self.init(source: source, maxPixelSize: maxPixelSize, maxBytes: maxBytes)
     }
 
-    private init?(source: CGImageSource, maxBytes: Int) {
+    private init?(source: CGImageSource, maxPixelSize: Int, maxBytes: Int) {
         let count = CGImageSourceGetCount(source)
         let options = [kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceCreateThumbnailWithTransform: true,
-                       kCGImageSourceThumbnailMaxPixelSize: Self.maxPixelSize] as CFDictionary
+                       kCGImageSourceThumbnailMaxPixelSize: maxPixelSize] as CFDictionary
         var frames: [CGImage] = []
         var delays: [Double] = []
         for index in 0..<count {
@@ -286,7 +286,8 @@ struct PetAnimation {
     /// ImageIO's clamped delay, as browsers play it: a missing or near-zero delay means 0.1 s.
     private static func delay(_ properties: [CFString: Any]?) -> Double {
         let delay = [(kCGImagePropertyGIFDictionary, kCGImagePropertyGIFDelayTime),
-                     (kCGImagePropertyWebPDictionary, kCGImagePropertyWebPDelayTime)]
+                     (kCGImagePropertyWebPDictionary, kCGImagePropertyWebPDelayTime),
+                     (kCGImagePropertyPNGDictionary, kCGImagePropertyAPNGDelayTime)]
             .lazy.compactMap { (properties?[$0.0] as? [CFString: Any])?[$0.1] as? Double }.first
         return delay.map { $0 > 0.01 ? $0 : 0.1 } ?? 0.1
     }
@@ -295,6 +296,12 @@ struct PetAnimation {
     var loopDuration: Double { delays.reduce(0, +) }
     /// Start of each frame as a share of the loop, plus the closing 1 that `.discrete` needs.
     var keyTimes: [Double] { delays.reduce(into: [0]) { $0.append($0.last! + $1) }.map { $0 / loopDuration } }
+    /// The frame on screen `seconds` after the start, looping.
+    func frame(at seconds: Double) -> CGImage {
+        let position = seconds.truncatingRemainder(dividingBy: loopDuration) / loopDuration
+        return frames[min(keyTimes.lastIndex { $0 <= position } ?? 0, frames.count - 1)]
+    }
+
     /// One full loop, clamped so a long animation can't hold the screen for long.
     var playDuration: Double { frames.count > 1 ? min(max(loopDuration, 1), 5) : 2 }
 }

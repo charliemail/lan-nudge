@@ -98,6 +98,12 @@ struct RequestCheckTests {
         #expect(RequestCheck(json(["version": 2, "type": "nudge", "id": id.uuidString, "effect": "shake"])) == .invalid(id: id))
     }
 
+    @Test func funnyFaceRoundTrips() throws {
+        let payload = try JSONEncoder().encode(NudgeRequest(id: id, effect: .funnyFace))
+        #expect(RequestCheck(payload) == .valid(id: id, effect: .funnyFace, message: nil, acceptsQueued: true))
+        #expect(String(decoding: payload, as: UTF8.self).contains("\"effect\":\"funnyFace\""))
+    }
+
     @Test func unknownEffectIsInvalidWithID() {
         #expect(RequestCheck(json(["version": 1, "type": "nudge", "id": id.uuidString, "effect": "explode"])) == .invalid(id: id))
     }

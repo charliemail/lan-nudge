@@ -32,6 +32,8 @@ struct DesktopPetTests {
         #expect(webp.aspectRatio == 2)
         #expect(abs(webp.playDuration - 1.5) < 0.01)
         #expect(zip(webp.keyTimes, [0, 1.0 / 3, 2.0 / 3, 1]).allSatisfy { abs($0 - $1) < 0.001 })
+        // 0.5 s per frame, looping every 1.5 s.
+        #expect([0, 0.49, 0.5, 1.2, 1.5, 2.1].map { webp.frames.firstIndex(of: webp.frame(at: $0)) } == [0, 0, 1, 2, 0, 1])
     }
 
     @Test func oversizedAnimationIsRefused() throws {
@@ -44,6 +46,14 @@ struct DesktopPetTests {
         #expect(CGImageDestinationFinalize(dest))
         #expect(PetAnimation(data: data as Data, maxBytes: 64 * 64 * 4 * 3) != nil)
         #expect(PetAnimation(data: data as Data, maxBytes: 64 * 64 * 4 * 3 - 1) == nil)
+    }
+
+    /// 做鬼臉 falls back to an emoji without it, so a missing resource would go unnoticed.
+    @Test func bundledFaceImageLoads() throws {
+        let url = try #require(Bundle.main.url(forResource: "Face", withExtension: "apng"))
+        let face = try #require(PetAnimation(url: url, maxPixelSize: 720))
+        #expect(face.frames.count == 40)
+        #expect(abs(face.loopDuration - 2) < 0.01)
     }
 
     @Test(arguments: ["Pet-idle", "Pet-shock", "Pet-read"])
