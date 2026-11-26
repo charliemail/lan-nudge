@@ -88,7 +88,11 @@ struct SettingsView: View {
                             if model.pet.customPoses.contains(pose) {
                                 Button("還原預設") { model.pet.restoreDefault(pose) }
                             }
-                            Button("選擇圖片…") { model.pet.choose(pose) }
+                            if model.pet.converting.contains(pose) {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Button("選擇圖片…") { model.pet.choose(pose) }
+                            }
                         }
                     }
                 }

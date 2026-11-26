@@ -33,6 +33,8 @@ final class DesktopPet {
     private(set) var customPoses: Set<Pose> = []
     private(set) var isShocking = false
     private(set) var error: String?
+    /// Poses whose chosen image is still being converted.
+    private(set) var converting: Set<Pose> = []
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let directory: URL
@@ -50,30 +52,33 @@ final class DesktopPet {
         refresh()
     }
 
-    static let imageTypes: [UTType] = [.gif, .webP]
-
-    /// Asks for a GIF or WebP and copies it in, so moving or deleting the original doesn't break the pet.
+    /// Asks for a GIF or WebP and stores it as a pet-sized APNG, so moving or deleting the original
+    /// doesn't break the pet and later launches decode it fast: ImageIO redecodes an animated WebP
+    /// from its first frame for every frame (seconds for a long one), an APNG in a blink. The slow
+    /// first decode runs off the main thread.
     func choose(_ pose: Pose) {
         let open = NSOpenPanel()
-        open.allowedContentTypes = Self.imageTypes
+        open.allowedContentTypes = [.gif, .webP]
         open.message = "選擇\(pose.title)（GIF 或 WebP）"
         guard open.runModal() == .OK, let source = open.url else { return }
-        // The stored extension follows the content, not the file name.
-        guard PetAnimation(url: source) != nil,
-              let type = CGImageSourceCreateWithURL(source as CFURL, nil).flatMap(CGImageSourceGetType).flatMap({ UTType($0 as String) }),
-              let ext = Self.imageTypes.first(where: type.conforms)?.preferredFilenameExtension else {
-            error = "讀不到這張圖，或動畫太大（尺寸 × 格數過多）：\(source.lastPathComponent)"
-            return
+        converting.insert(pose)
+        Task {
+            let png = await Task.detached(priority: .userInitiated) { PetAnimation(url: source)?.pngData() }.value
+            converting.remove(pose)
+            guard let png else {
+                error = "讀不到這張圖，或動畫太大（尺寸 × 格數過多）：\(source.lastPathComponent)"
+                return
+            }
+            do {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                removeCustom(pose)
+                try png.write(to: directory.appending(path: "\(pose.rawValue).png"))
+                error = nil
+            } catch {
+                self.error = "無法儲存圖片：\(error.localizedDescription)"
+            }
+            refresh()
         }
-        do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            removeCustom(pose)
-            try FileManager.default.copyItem(at: source, to: directory.appending(path: "\(pose.rawValue).\(ext)"))
-            error = nil
-        } catch {
-            self.error = "無法儲存圖片：\(error.localizedDescription)"
-        }
-        refresh()
     }
 
     /// One loop of the shock GIF, or nil when the pet can't react here (turned off, or not on the
@@ -133,8 +138,9 @@ final class DesktopPet {
         refresh()
     }
 
+    /// png: what `choose` stores; gif and webp: copies of the original kept by earlier versions.
     private func customURLs(_ pose: Pose) -> [URL] {
-        Self.imageTypes.compactMap(\.preferredFilenameExtension).map { directory.appending(path: "\(pose.rawValue).\($0)") }
+        ["png", "gif", "webp"].map { directory.appending(path: "\(pose.rawValue).\($0)") }
     }
 
     private func customURL(_ pose: Pose) -> URL? { customURLs(pose).first { FileManager.default.fileExists(atPath: $0.path) } }
@@ -296,6 +302,17 @@ struct PetAnimation {
     var loopDuration: Double { delays.reduce(0, +) }
     /// Start of each frame as a share of the loop, plus the closing 1 that `.discrete` needs.
     var keyTimes: [Double] { delays.reduce(into: [0]) { $0.append($0.last! + $1) }.map { $0 / loopDuration } }
+    /// The frames as a looping APNG with the same delays.
+    func pngData() -> Data? {
+        let data = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, frames.count, nil) else { return nil }
+        CGImageDestinationSetProperties(dest, [kCGImagePropertyPNGDictionary: [kCGImagePropertyAPNGLoopCount: 0]] as CFDictionary)
+        for (frame, delay) in zip(frames, delays) {
+            CGImageDestinationAddImage(dest, frame, [kCGImagePropertyPNGDictionary: [kCGImagePropertyAPNGDelayTime: delay]] as CFDictionary)
+        }
+        return CGImageDestinationFinalize(dest) ? data as Data : nil
+    }
+
     /// The frame on screen `seconds` after the start, looping.
     func frame(at seconds: Double) -> CGImage {
         let position = seconds.truncatingRemainder(dividingBy: loopDuration) / loopDuration

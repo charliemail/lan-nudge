@@ -25,8 +25,10 @@ struct DesktopPetTests {
 
     /// 3 frames (red, green, blue), 4×2 px, 500 ms each; made with img2webp. ImageIO can read WebP
     /// but not write it.
+    static let tinyWebP = "UklGRrQAAABXRUJQVlA4WAoAAAACAAAAAwAAAQAAQU5JTQYAAAD/////AABBTk1GKAAAAAAAAAAAAAMAAAEAAPQBAAJWUDhMDwAAAC8DQAAABxDlj/4HIqL/AQBBTk1GKAAAAAAAAAAAAAMAAAEAAPQBAABWUDhMDwAAAC8DQAAAB9C/iP4HIqL/AQBBTk1GKAAAAAAAAAAAAAMAAAEAAPQBAABWUDhMDwAAAC8DQAAABxDR/v4HIqL/AQA="
+
     @Test func animatedWebPPlaysEveryFrame() throws {
-        let data = try #require(Data(base64Encoded: "UklGRrQAAABXRUJQVlA4WAoAAAACAAAAAwAAAQAAQU5JTQYAAAD/////AABBTk1GKAAAAAAAAAAAAAMAAAEAAPQBAAJWUDhMDwAAAC8DQAAABxDlj/4HIqL/AQBBTk1GKAAAAAAAAAAAAAMAAAEAAPQBAABWUDhMDwAAAC8DQAAAB9C/iP4HIqL/AQBBTk1GKAAAAAAAAAAAAAMAAAEAAPQBAABWUDhMDwAAAC8DQAAABxDR/v4HIqL/AQA="))
+        let data = try #require(Data(base64Encoded: Self.tinyWebP))
         let webp = try #require(PetAnimation(data: data))
         #expect(webp.frames.count == 3)
         #expect(webp.aspectRatio == 2)
@@ -34,6 +36,17 @@ struct DesktopPetTests {
         #expect(zip(webp.keyTimes, [0, 1.0 / 3, 2.0 / 3, 1]).allSatisfy { abs($0 - $1) < 0.001 })
         // 0.5 s per frame, looping every 1.5 s.
         #expect([0, 0.49, 0.5, 1.2, 1.5, 2.1].map { webp.frames.firstIndex(of: webp.frame(at: $0)) } == [0, 0, 1, 2, 0, 1])
+    }
+
+    /// What `choose` stores: the same frames and timing, readable again.
+    @Test func pngDataKeepsFramesAndTiming() throws {
+        let data = try #require(Data(base64Encoded: Self.tinyWebP))
+        let webp = try #require(PetAnimation(data: data))
+        let png = try #require(webp.pngData())
+        let again = try #require(PetAnimation(data: png))
+        #expect(again.frames.count == 3)
+        #expect(abs(again.loopDuration - 1.5) < 0.01)
+        #expect(again.aspectRatio == 2)
     }
 
     @Test func oversizedAnimationIsRefused() throws {
