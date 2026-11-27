@@ -52,7 +52,7 @@ final class OverlayController {
     private var toastPanel: NSPanel?
 
     /// A short notice (a read receipt) at the top right, clear of the nudge overlay and the pet.
-    func toast(_ text: String) {
+    func toast(_ text: String, seconds: Double = 2) {
         toastPanel?.orderOut(nil)
         let screens = NSScreen.screens.map { (frame: $0.frame, visible: $0.visibleFrame) }
         guard let visible = Self.visibleFrame(for: NSEvent.mouseLocation, screens: screens) else { return }
@@ -63,7 +63,7 @@ final class OverlayController {
         panel.orderFrontRegardless()
         toastPanel = panel
         Task {
-            try? await Task.sleep(for: .seconds(2))
+            try? await Task.sleep(for: .seconds(seconds))
             guard toastPanel === panel else { return }
             panel.orderOut(nil)
             toastPanel = nil

@@ -66,6 +66,11 @@ struct RequestCheckTests {
         #expect(RequestCheck(json(["version": 2, "type": "read", "id": id.uuidString])) == .invalid(id: id))
     }
 
+    @Test func helloRoundTrips() throws {
+        #expect(RequestCheck(try JSONEncoder().encode(Hello(id: id, port: 47123))) == .hello(id: id, port: 47123, name: nil))
+        #expect(RequestCheck(json(["version": 1, "type": "hello", "id": id.uuidString])) == .invalid(id: id))
+    }
+
     /// Pre-0.4.0 senders send neither key: no message, and they can't read a `queued` ack.
     @Test func oldSenderFormat() {
         #expect(RequestCheck(json(["version": 1, "type": "nudge", "id": id.uuidString, "effect": "shake"]))

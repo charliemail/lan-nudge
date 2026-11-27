@@ -21,8 +21,10 @@ struct MutualTLSTests {
         let receiver = PeerNetwork(identity: b, displayName: "B", advertise: false)
         var seenSender: String?
         var seenCheck: RequestCheck?
-        receiver.onRequest = { sender, check in
+        var seenHost: String?
+        receiver.onRequest = { sender, host, check in
             seenSender = sender
+            seenHost = host
             seenCheck = check
             return check.id == nil ? nil : .displayed
         }
@@ -49,6 +51,24 @@ struct MutualTLSTests {
         let readID = UUID()
         #expect(await sender.sendReadReceipt(for: readID, to: peer(hint: b.fingerprint, [endpoint])) == .ack(.displayed))
         #expect(seenCheck == .read(id: readID))
+
+        // A hello carries the sender's port; its address comes from the connection.
+        #expect(await sender.hello(peer(hint: b.fingerprint, [endpoint])) == nil)
+        sender.startListener(port: nil)
+        var senderPort: UInt16?
+        for _ in 0..<50 where senderPort == nil {
+            try await Task.sleep(for: .milliseconds(20))
+            senderPort = sender.listeningPort
+        }
+        #expect(await sender.hello(peer(hint: b.fingerprint, [endpoint])) == .ack(.displayed))
+        guard case .hello(_, let helloPort, "A")? = seenCheck else {
+            Issue.record("hello did not arrive: \(String(describing: seenCheck))"); return
+        }
+        #expect(helloPort == senderPort && seenHost == "127.0.0.1")
+
+        // A scan accepts any certificate and learns who answered.
+        let answer = await sender.greet("127.0.0.1", at: try #require(port), from: try #require(senderPort))
+        #expect(answer?.fingerprint == b.fingerprint && answer?.name == "B")
 
         // A Bonjour record claiming another device's hint can't redirect the nudge.
         seenSender = nil

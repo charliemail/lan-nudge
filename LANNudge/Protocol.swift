@@ -32,6 +32,9 @@ enum Wire {
     static let bonjourType = "_lannudge._tcp"
     static let maxPayloadBytes = 4096
     static let deadline: Duration = .seconds(5)
+    /// Listening port when free, so a remembered address stays valid across restarts; a second copy
+    /// on the same Mac falls back to a random one.
+    static let preferredPort: UInt16 = 47123
 }
 
 /// `message` and `acceptsQueued` are optional additions to version 1: receivers before 0.4.0 ignore
@@ -78,11 +81,25 @@ struct ReadReceipt: Codable, Equatable {
     let id: UUID
 }
 
+/// "Are you still at this address?" to a remembered peer Bonjour can't see (another Wi-Fi on the same
+/// VPN), or "who's there?" from a VPN scan. The receiver learns the sender's current address from the
+/// connection itself, never from the payload, and answers with its own name. Copies before 0.6.0
+/// answer it `invalid`, which still proves they're reachable.
+struct Hello: Codable, Equatable {
+    var version = Wire.version
+    var type = "hello"
+    let id: UUID
+    let port: UInt16
+    var name: String?
+}
+
 struct Ack: Codable, Equatable {
     var version = Wire.version
     var type = "ack"
     let id: UUID
     let status: AckStatus
+    /// Only in answer to a `Hello`; older senders ignore it.
+    var name: String?
 }
 
 /// Outcome of parsing an incoming payload. Unknown versions/effects still yield the id when it is
@@ -91,12 +108,14 @@ enum RequestCheck: Equatable {
     case valid(id: UUID, effect: Effect, message: String?, acceptsQueued: Bool)
     /// A `ReadReceipt` for a nudge this copy sent.
     case read(id: UUID)
+    /// A `Hello`; `port` is where the sender listens.
+    case hello(id: UUID, port: UInt16, name: String?)
     case invalid(id: UUID)
     case unreadable
 
     var id: UUID? {
         switch self {
-        case .valid(let id, _, _, _), .read(let id), .invalid(let id): id
+        case .valid(let id, _, _, _), .read(let id), .hello(let id, _, _), .invalid(let id): id
         case .unreadable: nil
         }
     }
@@ -109,6 +128,8 @@ enum RequestCheck: Equatable {
             let effect: String?
             let message: String?
             let acceptsQueued: Bool?
+            let port: UInt16?
+            let name: String?
         }
         guard let loose = try? JSONDecoder().decode(Loose.self, from: payload), let id = loose.id else {
             self = .unreadable
@@ -116,6 +137,10 @@ enum RequestCheck: Equatable {
         }
         if loose.version == Wire.version, loose.type == "read" {
             self = .read(id: id)
+            return
+        }
+        if loose.version == Wire.version, loose.type == "hello", let port = loose.port {
+            self = .hello(id: id, port: port, name: NudgeMessage.sanitize(loose.name))
             return
         }
         guard loose.version == Wire.version, loose.type == "nudge",

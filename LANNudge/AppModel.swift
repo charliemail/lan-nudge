@@ -64,6 +64,7 @@ final class AppModel {
     private(set) var networkProblem: String?
     private(set) var identityError: String?
     private(set) var lastResult: String?
+    private(set) var scanning = false
     let pet: DesktopPet
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -72,6 +73,12 @@ final class AppModel {
     @ObservationIgnored private var gate = ReceiveGate()
     @ObservationIgnored private var screensAsleep = false
     @ObservationIgnored private var sent = SentLog()
+    /// Saved as JSON; colleagues' names and addresses stay on this Mac only.
+    @ObservationIgnored private var known: KnownPeers
+    @ObservationIgnored private var bonjourPeers: [Peer] = []
+    /// Remembered peers that answered a hello, by hint; listed while Bonjour can't see them.
+    @ObservationIgnored private var remembered: [String: Peer] = [:]
+    @ObservationIgnored private var probing: Set<String> = []
     /// The sticky nudge on screen, for its read receipt.
     @ObservationIgnored private var onScreen: Receipt?
     private var queue = NudgeQueue<Pending>()
@@ -121,6 +128,7 @@ final class AppModel {
         sendReadReceipts = defaults.object(forKey: "sendReadReceipts") as? Bool ?? true
         historyLimit = defaults.object(forKey: "historyLimit") as? Int ?? Self.defaultHistoryLimit
         blocked = defaults.dictionary(forKey: "blocked") as? [String: String] ?? [:]
+        known = defaults.data(forKey: "knownPeers").flatMap { try? JSONDecoder().decode(KnownPeers.self, from: $0) } ?? KnownPeers()
         pet = DesktopPet(defaults: defaults, instance: instance)
         pet.onDoubleClick = { [weak self] in self?.bringUp("panel") }
 
@@ -276,10 +284,17 @@ final class AppModel {
         return (animation, max(animation, min(3 + Double(message.count / 10), 8)))
     }
 
-    private func receive(from sender: String, _ check: RequestCheck) -> AckStatus? {
+    private func receive(from sender: String, host: String?, _ check: RequestCheck) -> AckStatus? {
         switch check {
         case .unreadable:
             return nil
+        case .hello(_, let port, let helloName):
+            let hint = Fingerprint.hint(sender)
+            guard let host, known.heard(from: hint, host: host, port: port, name: helloName, now: .now) else { return .invalid }
+            saveKnown()
+            if !bonjourPeers.contains(where: { $0.hint == hint }) { remembered[hint] = known.peer(hint) }
+            updatePeers()
+            return .displayed
         case .invalid:
             return .invalid
         case .read(let id):
@@ -290,7 +305,8 @@ final class AppModel {
         case .valid(let id, let effect, let message, let acceptsQueued):
             // ponytail: the name comes from the sender's own Bonjour record, so it can be spoofed;
             // accepted with the no-pairing decision.
-            let name = peers.first { sender.hasPrefix($0.hint) }.map(label) ?? "未知裝置（\(sender.prefix(4))）"
+            let name = peers.first { sender.hasPrefix($0.hint) }.map(label)
+                ?? known.entries[Fingerprint.hint(sender)]?.name ?? "未知裝置（\(sender.prefix(4))）"
             let text = showMessages ? message : nil
             let away = screensAsleep || Self.screenLocked()
             queue.capacity = stickyNudges ? queueLimit : 5
@@ -322,11 +338,93 @@ final class AppModel {
         let isTestHost = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
         guard network == nil, !displayName.isEmpty, !isTestHost, let identity else { return }
         let network = PeerNetwork(identity: identity, displayName: displayName)
-        network.onRequest = { [weak self] in self?.receive(from: $0, $1) }
-        network.onPeersChanged = { [weak self] in self?.peers = $0.sorted { $0.name < $1.name } }
+        network.onRequest = { [weak self] in self?.receive(from: $0, host: $1, $2) }
+        network.onPeersChanged = { [weak self] in self?.bonjourChanged($0) }
         network.onProblem = { [weak self] in self?.networkProblem = $0 }
+        // Addresses need a moment to settle after a VPN connects.
+        network.onNetworkChanged = { [weak self] in
+            Task { try? await Task.sleep(for: .seconds(3)); self?.probeRemembered() }
+        }
         network.start()
         self.network = network
+        Task { [weak self] in
+            while true {
+                try? await Task.sleep(for: .seconds(300))
+                guard let self else { return }
+                probeRemembered()
+            }
+        }
+    }
+
+    // MARK: Remembered peers
+
+    private func bonjourChanged(_ found: [Peer]) {
+        let lost = Set(bonjourPeers.map(\.hint)).subtracting(found.map(\.hint))
+        bonjourPeers = found
+        found.forEach { known.met($0, now: .now) }
+        saveKnown()
+        found.forEach { remembered[$0.hint] = nil }
+        updatePeers()
+        // Someone who just left the Wi-Fi may still be on the VPN.
+        if !lost.isEmpty { probeRemembered() }
+    }
+
+    /// Says hello to every remembered peer Bonjour can't see. An answer lists it (and tells it this
+    /// Mac's current address); silence drops it until the next round.
+    private func probeRemembered() {
+        guard let network else { return }
+        known.prune(now: .now)
+        let visible = Set(bonjourPeers.map(\.hint))
+        for hint in known.entries.keys where !visible.contains(hint) && !probing.contains(hint) {
+            guard let peer = known.peer(hint) else { continue }
+            probing.insert(hint)
+            Task {
+                defer { probing.remove(hint) }
+                guard let outcome = await network.hello(peer) else { return }
+                guard !bonjourPeers.contains(where: { $0.hint == hint }) else { return }
+                if case .ack = outcome {
+                    known.touch(hint, now: .now)
+                    saveKnown()
+                    remembered[hint] = peer
+                } else {
+                    remembered[hint] = nil
+                }
+                updatePeers()
+            }
+        }
+    }
+
+    /// The 掃描 VPN button: meets colleagues on the VPN that were never on the same Wi-Fi. The result
+    /// also pops up at the top right, since the menu has closed by the time the scan ends.
+    func scanVPN() {
+        guard let network, !scanning else { return }
+        scanning = true
+        Task {
+            var result = "沒有連上 VPN，無法掃描"
+            defer {
+                scanning = false
+                lastResult = result
+                OverlayController.shared.toast(result, seconds: 5)
+            }
+            guard let found = await network.scanVPN() else { return }
+            for answer in found {
+                let hint = Fingerprint.hint(answer.fingerprint)
+                guard known.heard(from: hint, host: answer.host, port: Wire.preferredPort, name: answer.name, now: .now) else { continue }
+                if !bonjourPeers.contains(where: { $0.hint == hint }) { remembered[hint] = known.peer(hint) }
+            }
+            saveKnown()
+            updatePeers()
+            result = found.isEmpty ? "VPN 上沒有找到其他 LAN Nudge" : "VPN 上找到 \(found.count) 台"
+        }
+    }
+
+    private func updatePeers() {
+        let visible = Set(bonjourPeers.map(\.hint))
+        peers = (bonjourPeers + remembered.values.filter { !visible.contains($0.hint) }).sorted { $0.name < $1.name }
+    }
+
+    private func saveKnown() {
+        defaults.set(try? JSONEncoder().encode(known), forKey: "knownPeers")
     }
 }
 

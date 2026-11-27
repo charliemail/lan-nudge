@@ -67,6 +67,8 @@ private struct MenuContent: View {
                     }
                 }
             }
+            Button(model.scanning ? "掃描 VPN 中…" : "掃描 VPN 上的裝置") { model.scanVPN() }
+                .disabled(model.scanning || model.needsSetup)
         }
 
         if let result = model.lastResult { Text(result) }

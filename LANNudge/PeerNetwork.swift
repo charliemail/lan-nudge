@@ -38,8 +38,11 @@ enum SendOutcome: Equatable {
 final class PeerNetwork {
     var onPeersChanged: ([Peer]) -> Void = { _ in }
     var onProblem: (String?) -> Void = { _ in }
-    /// Called with the sender's certificate fingerprint; nil closes without replying.
-    var onRequest: (_ sender: String, _ check: RequestCheck) -> AckStatus? = { _, _ in nil }
+    /// Called with the sender's certificate fingerprint and the address it connected from; nil closes
+    /// without replying.
+    var onRequest: (_ sender: String, _ host: String?, _ check: RequestCheck) -> AckStatus? = { _, _, _ in nil }
+    /// VPN on/off, Wi-Fi change, wake: remembered peers may be reachable (or gone) now.
+    var onNetworkChanged: () -> Void = {}
 
     private let identity: SecIdentity
     private let ownHint: String
@@ -67,11 +70,11 @@ final class PeerNetwork {
         startBrowser()
         // VPN on/off and Wi-Fi changes alter the address list peers should try.
         pathMonitor.pathUpdateHandler = { [weak self] _ in
-            MainActor.assumeIsolated { self?.readvertise() }
+            MainActor.assumeIsolated { self?.readvertise(); self?.onNetworkChanged() }
         }
         pathMonitor.start(queue: .main)
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.readvertise() }
+            MainActor.assumeIsolated { self?.readvertise(); self?.onNetworkChanged() }
         }
     }
 
@@ -82,11 +85,11 @@ final class PeerNetwork {
 
     // MARK: Receiving
 
-    func startListener() {
+    func startListener(port: NWEndpoint.Port? = NWEndpoint.Port(rawValue: Wire.preferredPort)) {
         // No pairing by product decision: any client certificate is accepted. TLS still encrypts and
         // gives each sender a stable fingerprint for the per-sender rate limit and de-duplication.
         let parameters = TLSSetup.parameters(identity: identity) { _ in true }
-        guard let listener = try? NWListener(using: parameters) else {
+        guard let listener = try? (port.map { try NWListener(using: parameters, on: $0) } ?? NWListener(using: parameters)) else {
             listenerProblem = "無法開始接收提醒"
             return
         }
@@ -103,6 +106,7 @@ final class PeerNetwork {
                 case .failed(let error):
                     listener?.cancel()
                     self?.listener = nil
+                    if port != nil, case .posix(.EADDRINUSE) = error { self?.startListener(port: nil); return }
                     self?.listenerProblem = Self.describe(error)
                     self?.restart { $0.startListener() }
                 default:
@@ -141,11 +145,15 @@ final class PeerNetwork {
                     }
                     FrameIO.readOne(connection) { payload in
                         let check = payload.map(RequestCheck.init) ?? .unreadable
-                        guard let id = check.id, let status = self.onRequest(sender, check) else {
+                        var host: String?
+                        if case .hostPort(let remote, _) = connection.endpoint { host = "\(remote)" }
+                        guard let id = check.id, let status = self.onRequest(sender, host, check) else {
                             connection.cancel()
                             return
                         }
-                        FrameIO.send(Ack(id: id, status: status), on: connection) { connection.cancel() }
+                        var ack = Ack(id: id, status: status)
+                        if case .hello = check { ack.name = self.displayName }
+                        FrameIO.send(ack, on: connection) { connection.cancel() }
                     }
                 default:
                     break
@@ -228,12 +236,50 @@ final class PeerNetwork {
         await deliver(ReadReceipt(id: id), id: id, to: peer)
     }
 
+    /// nil until the listener has a port to tell the peer.
+    func hello(_ peer: Peer) async -> SendOutcome? {
+        guard let port = listeningPort else { return nil }
+        let id = UUID()
+        return await deliver(Hello(id: id, port: port, name: displayName), id: id, to: peer)
+    }
+
+    /// Hellos to every other host of this Mac's VPN subnets on the preferred port, 32 at a time,
+    /// accepting any certificate: the way to meet peers on the VPN that Bonjour never showed. nil when
+    /// no VPN is connected (or the listener isn't up yet).
+    func scanVPN() async -> [(fingerprint: String, name: String, host: String)]? {
+        let hosts = LocalAddresses.vpnScanHosts()
+        guard !hosts.isEmpty, let port = listeningPort else { return nil }
+        var found: [(fingerprint: String, name: String, host: String)] = []
+        for start in stride(from: 0, to: hosts.count, by: 32) {
+            let batch = hosts[start..<min(start + 32, hosts.count)].map { host in Task { await greet(host, at: Wire.preferredPort, from: port) } }
+            for task in batch {
+                if let answer = await task.value { found.append(answer) }
+            }
+        }
+        return found.filter { Fingerprint.hint($0.fingerprint) != ownHint }
+    }
+
+    func greet(_ host: String, at target: UInt16, from port: UInt16) async -> (fingerprint: String, name: String, host: String)? {
+        guard let target = NWEndpoint.Port(rawValue: target) else { return nil }
+        let id = UUID()
+        let endpoint = NWEndpoint.hostPort(host: NWEndpoint.Host(host), port: target)
+        let reply = await withCheckedContinuation { continuation in
+            SendAttempt(payload: Hello(id: id, port: port, name: displayName), id: id, deadline: .seconds(2),
+                        continuation: continuation).start([endpoint]) { [identity] in
+                TLSSetup.parameters(identity: identity) { _ in true }
+            }
+        }
+        guard case .ack = reply.outcome, let fingerprint = reply.fingerprint,
+              let name = NudgeMessage.sanitize(reply.name) else { return nil }
+        return (fingerprint, name, host)
+    }
+
     private func deliver(_ payload: some Encodable, id: UUID, to peer: Peer) async -> SendOutcome {
         await withCheckedContinuation { continuation in
             SendAttempt(payload: payload, id: id, continuation: continuation).start(peer.candidates) { [identity] in
                 TLSSetup.parameters(identity: identity) { $0.hasPrefix(peer.hint) }
             }
-        }
+        }.outcome
     }
 }
 
@@ -244,16 +290,25 @@ final class PeerNetwork {
 private final class SendAttempt {
     private let payload: any Encodable
     private let id: UUID
-    private let continuation: CheckedContinuation<SendOutcome, Never>
+    private let deadline: Duration
+    private let continuation: CheckedContinuation<Reply, Never>
     private var connections: [NWConnection] = []
     private var failed: Set<ObjectIdentifier> = []
     private var winner: NWConnection?
     private var finished = false
     private var localNetworkDenied = false
 
-    init(payload: any Encodable, id: UUID, continuation: CheckedContinuation<SendOutcome, Never>) {
+    struct Reply {
+        var outcome: SendOutcome
+        /// The answering certificate and the name in its ack (answers to a `Hello` only).
+        var fingerprint: String?
+        var name: String?
+    }
+
+    init(payload: any Encodable, id: UUID, deadline: Duration = Wire.deadline, continuation: CheckedContinuation<Reply, Never>) {
         self.payload = payload
         self.id = id
+        self.deadline = deadline
         self.continuation = continuation
     }
 
@@ -269,7 +324,7 @@ private final class SendAttempt {
         }
         // Holds self until the deadline even if every connection is already gone.
         Task {
-            try? await Task.sleep(for: Wire.deadline)
+            try? await Task.sleep(for: deadline)
             finish(.noAck)
         }
     }
@@ -285,7 +340,7 @@ private final class SendAttempt {
             FrameIO.readOne(connection) { [self] payload in
                 guard let payload, let ack = try? JSONDecoder().decode(Ack.self, from: payload),
                       ack.version == Wire.version, ack.id == id else { return finish(.noAck) }
-                finish(.ack(ack.status))
+                finish(.ack(ack.status), fingerprint: TLSSetup.peerFingerprint(connection), name: ack.name)
             }
         case .waiting:
             if connection.currentPath?.unsatisfiedReason == .localNetworkDenied { localNetworkDenied = true }
@@ -306,11 +361,11 @@ private final class SendAttempt {
         }
     }
 
-    private func finish(_ outcome: SendOutcome) {
+    private func finish(_ outcome: SendOutcome, fingerprint: String? = nil, name: String? = nil) {
         guard !finished else { return }
         finished = true
         connections.forEach { $0.cancel() }
-        continuation.resume(returning: outcome)
+        continuation.resume(returning: Reply(outcome: outcome, fingerprint: fingerprint, name: name))
     }
 }
 
@@ -340,6 +395,68 @@ enum FrameIO {
     }
 }
 
+/// Peers met over Bonjour, a VPN scan or a hello, remembered so they can still be reached when Bonjour
+/// can't see them (another Wi-Fi on the same VPN). Addresses come from Bonjour or from the connection
+/// itself, never from a payload, so nobody can point this Mac at a third host.
+// ponytail: anyone on the network can add itself with a hello; the cap evicts the oldest, so a flood of
+// fake certificates could push real colleagues out. Keep Bonjour/scan entries apart if that happens.
+struct KnownPeers: Codable, Equatable {
+    struct Entry: Codable, Equatable {
+        var name: String
+        /// Hosts only, most recently confirmed first.
+        var addresses: [String]
+        var port: UInt16
+        var seen: Date
+    }
+
+    static let maxEntries = 50
+    static let maxAge: TimeInterval = 30 * 86_400
+    static let maxAddresses = 4
+    /// By fingerprint hint.
+    private(set) var entries: [String: Entry] = [:]
+
+    /// A Bonjour sighting; skipped until its TXT record carries the port and addresses.
+    mutating func met(_ peer: Peer, now: Date) {
+        let hostPorts: [(host: String, port: UInt16)] = peer.candidates.compactMap {
+            guard case .hostPort(let host, let port) = $0 else { return nil }
+            return ("\(host)", port.rawValue)
+        }
+        guard let port = hostPorts.first?.port else { return }
+        entries[peer.hint] = Entry(name: peer.name, addresses: Array(hostPorts.map(\.host).prefix(Self.maxAddresses)),
+                                   port: port, seen: now)
+        prune(now: now)
+    }
+
+    /// A verified sender (or scan answer) at `host`. False for a stranger that gave no name.
+    mutating func heard(from hint: String, host: String, port: UInt16, name: String? = nil, now: Date) -> Bool {
+        guard var entry = entries[hint] ?? name.map({ Entry(name: $0, addresses: [], port: port, seen: now) }) else { return false }
+        if let name { entry.name = name }
+        entry.addresses = Array(([host] + entry.addresses.filter { $0 != host }).prefix(Self.maxAddresses))
+        entry.port = port
+        entry.seen = now
+        entries[hint] = entry
+        prune(now: now)
+        return true
+    }
+
+    mutating func touch(_ hint: String, now: Date) {
+        entries[hint]?.seen = now
+    }
+
+    func peer(_ hint: String) -> Peer? {
+        guard let entry = entries[hint], let port = NWEndpoint.Port(rawValue: entry.port) else { return nil }
+        return Peer(id: "remembered-\(hint)", name: "\(entry.name)（VPN）", hint: hint,
+                    candidates: entry.addresses.map { .hostPort(host: NWEndpoint.Host($0), port: port) })
+    }
+
+    mutating func prune(now: Date) {
+        entries = entries.filter { now.timeIntervalSince($0.value.seen) < Self.maxAge }
+        while entries.count > Self.maxEntries, let oldest = entries.min(by: { $0.value.seen < $1.value.seen })?.key {
+            entries[oldest] = nil
+        }
+    }
+}
+
 enum LocalAddresses {
     /// LAN interfaces first, then the rest (VPN). Virtual bridges are skipped: other Macs can't reach them.
     /// Capped well under the 255-byte TXT value limit.
@@ -351,6 +468,40 @@ enum LocalAddresses {
             out.append(entry.address)
         }
         return out.joined(separator: ",")
+    }
+
+    /// Every other host of each VPN interface's subnet, at most its /24: wider VPN pools would take
+    /// minutes and look like a sweep. Point-to-point /31–/32 links (Tailscale) have no neighbours.
+    static func vpnScanHosts() -> [String] {
+        vpnInterfaces().flatMap { scanHosts(address: $0.address, prefix: $0.prefix) }
+    }
+
+    static func scanHosts(address: UInt32, prefix: Int) -> [String] {
+        guard (8...30).contains(prefix) else { return [] }
+        let bits = max(prefix, 24)
+        let mask = UInt32.max << (32 - bits)
+        let network = address & mask
+        return (network + 1..<(network | ~mask)).filter { $0 != address }.map {
+            "\($0 >> 24).\($0 >> 16 & 255).\($0 >> 8 & 255).\($0 & 255)"
+        }
+    }
+
+    private static func vpnInterfaces() -> [(address: UInt32, prefix: Int)] {
+        var result: [(address: UInt32, prefix: Int)] = []
+        var head: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&head) == 0 else { return [] }
+        defer { freeifaddrs(head) }
+        var cursor = head
+        while let ifa = cursor?.pointee {
+            defer { cursor = ifa.ifa_next }
+            let name = String(cString: ifa.ifa_name)
+            guard ["utun", "ppp", "ipsec"].contains(where: name.hasPrefix), ifa.ifa_flags & UInt32(IFF_UP) != 0,
+                  let addr = ifa.ifa_addr, addr.pointee.sa_family == UInt8(AF_INET), let mask = ifa.ifa_netmask else { continue }
+            let ip = addr.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { UInt32(bigEndian: $0.pointee.sin_addr.s_addr) }
+            let bits = mask.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { UInt32(bigEndian: $0.pointee.sin_addr.s_addr) }.nonzeroBitCount
+            result.append((ip, bits))
+        }
+        return result
     }
 
     static func txtSafe(_ text: String) -> String {

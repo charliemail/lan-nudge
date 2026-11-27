@@ -21,7 +21,7 @@ struct ControlPanelView: View {
                 Text(result).foregroundStyle(.secondary)
             }
 
-            GroupBox("附近裝置") {
+            GroupBox {
                 if model.needsSetup {
                     Text("先到「設定」輸入顯示名稱，才會開始搜尋與接收。").foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                 } else if model.peers.isEmpty {
@@ -35,6 +35,16 @@ struct ControlPanelView: View {
                     }
                     .frame(maxHeight: 5 * 30)
                     .fixedSize(horizontal: false, vertical: true)
+                }
+            } label: {
+                HStack {
+                    Text("附近裝置")
+                    Spacer()
+                    if model.scanning { ProgressView().controlSize(.small) }
+                    Button("掃描 VPN") { model.scanVPN() }
+                        .controlSize(.small)
+                        .disabled(model.scanning || model.needsSetup)
+                        .help("找同一個 VPN 上、不在同一個 Wi-Fi 的同事")
                 }
             }
 
